@@ -16,10 +16,6 @@
 
 #======================================================================#
 
-# set "target_resolution" to the target resolution before
-# I call the script from two directories up, so for me it is:
-# python ../../refine_global_piecewise_constant.py
-
 import time
 import numpy as np
 import h5py
