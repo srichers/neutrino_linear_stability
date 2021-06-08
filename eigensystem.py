@@ -27,7 +27,8 @@ h = 6.6260755e-27 # erg s
 hbar = h/(2.*np.pi)
 c = 2.99792458e10 # cm/s
 MeV = 1.60218e-6 # erg
-GF_GeV2 = 1.1663787e-5 # GeV^2
+eV = MeV/1e6 # erg
+GF_GeV2 = 1.1663787e-5 # GeV^-2
 GF = GF_GeV2 / (1000*MeV)**2 * (hbar*c)**3
 Mp = 1.6726219e-24
 
