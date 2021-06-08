@@ -23,7 +23,7 @@ import fileinput
 import sys
 import glob
 
-h = 6.62606885e-27 # erg s
+h = 6.6260755e-27 # erg s
 hbar = h/(2.*np.pi)
 c = 2.99792458e10 # cm/s
 MeV = 1.60218e-6 # erg
