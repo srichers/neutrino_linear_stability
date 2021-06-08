@@ -135,6 +135,7 @@ def single_file(input_filename):
     neutrino_energy_mid = h * np.array(fin["distribution_frequency_mid(Hz,lab)"])
     number_dist = np.sum(new_dist / neutrino_energy_mid[np.newaxis,np.newaxis,:,np.newaxis,np.newaxis],\
                          axis=(2,4))
+    number_dist[:,2,:] /= 4. # heavy lepton distribution represents mu,tau,mubar,taubar
     print("number_dist:",np.shape(number_dist))
     
     #============================#
