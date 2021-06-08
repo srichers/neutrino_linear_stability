@@ -33,13 +33,13 @@ GF = GF_GeV2 / (1000*MeV)**2 * (hbar*c)**3
 Mp = 1.6726219e-24
 
 # inputs #
-target_resolution = 1280
+target_resolution = 20
 input_filename = "lotsadata/original_data_DO/15Msun_400ms_DO.h5"
 dm2 = 2.4e-3 * eV**2 # erg
 k = 1.088e-18 # erg
 ir = 254
 
-def stability_matrix(mu_tilde,n_tilde,omega_tilde, Ve, phi0, phi1):
+def stability_matrix_nok(mu_tilde,n_tilde,omega_tilde, Ve, phi0, phi1):
     matrix_size = len(mu_tilde)
 
     # self-interaction part
@@ -55,6 +55,11 @@ def stability_matrix(mu_tilde,n_tilde,omega_tilde, Ve, phi0, phi1):
             + phi0 \
             - mu_tilde[i]*phi1
     print("after vac/matter:",np.min(S_nok),np.max(S_nok))
+
+    return S_nok
+
+def stability_matrix(S_nok, mu_tilde, k):
+    matrix_size = len(mu_tilde)
             
     # k term
     S = S_nok
@@ -185,7 +190,8 @@ def single_file(input_filename):
     #============================#
     # construct stability matrix #
     #============================#
-    S = stability_matrix(mu_tilde, n_tilde[ir], omega_tilde[ir], Ve[ir], phi0[ir], phi1[ir])
+    S_nok = stability_matrix_nok(mu_tilde, n_tilde[ir], omega_tilde[ir], Ve[ir], phi0[ir], phi1[ir])
+    S = stability_matrix(S_nok, mu_tilde, k)
     print("S:",np.shape(S))
 
     #=================#
