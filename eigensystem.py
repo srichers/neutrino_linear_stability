@@ -35,7 +35,7 @@ Mp = 1.6726219e-24
 # inputs #
 target_resolution = 1280
 input_filename = "lotsadata/original_data_DO/15Msun_400ms_DO.h5"
-dm2 = 0
+dm2 = 2.4e-3 * eV**2 # erg
 k = 1.088e-18 # erg
 ir = 254
 
