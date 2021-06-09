@@ -176,10 +176,6 @@ def stability_matrix(S_nok, mu_tilde, k):
     return S
 
 def single_file(input_filename):
-    # get grid data from old file
-    output_filename = input_filename.strip(".h5") + "_"+str(target_resolution)+".h5"
-    print("Creating", output_filename)
-
     # read in data and calculate moments
     mugrid, mumid, frequency, dist, rho, Ye = read_data(input_filename)
 
