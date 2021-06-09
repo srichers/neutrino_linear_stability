@@ -22,6 +22,7 @@ import h5py
 import fileinput
 import sys
 import glob
+import scipy.linalg
 
 h = 6.6260755e-27 # erg s
 hbar = h/(2.*np.pi)
@@ -198,8 +199,9 @@ def single_file(input_filename):
     # get eigenvalues #
     #=================#
     start = time.time()
-    evals = np.linalg.eigvals(S)
+    evals = scipy.linalg.eigvals(S)
     end = time.time()
     print("Time elapsed:",end-start)
+    print(evals)
 
 single_file(input_filename)
