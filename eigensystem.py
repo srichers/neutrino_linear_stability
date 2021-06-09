@@ -23,6 +23,7 @@ import fileinput
 import sys
 import glob
 import scipy.linalg
+import copy
 
 h = 6.6260755e-27 # erg s
 hbar = h/(2.*np.pi)
@@ -163,13 +164,21 @@ def stability_matrix_nok(mu_tilde,n_tilde,omega_tilde, Ve, phi0, phi1):
     return S_nok
 
 #=================================#
+# do the real work for a single k #
+#=================================#
+def eigenvalues_single_k(k):
+    S = stability_matrix(S_nok, mu_tilde, k)
+    return scipy.linalg.eigvals(S)
+
+
+#=================================#
 # construct full stability matrix #
 #=================================#
 def stability_matrix(S_nok, mu_tilde, k):
     matrix_size = len(mu_tilde)
             
     # k term
-    S = S_nok
+    S = copy.deepcopy(S_nok)
     for i in range(matrix_size):
         S[i,i] += mu_tilde[i]*k
     print("after k:",np.min(S),np.max(S))
@@ -210,19 +219,23 @@ def single_file(input_filename):
     print("phi0:",np.shape(phi0))
 
     # construct tilde vectors
+    global mu_tilde, S_nok
     omega_tilde, mu_tilde, n_tilde = construct_tilde_vectors(mumid, dm2, average_energy, number_dist)
 
     ir_list = range(ir_start, ir_stop+1)
     eigenvalues = []
     for ir in ir_list:
         start = time.time()
+
         # construct stability matrix
         S_nok = stability_matrix_nok(mu_tilde, n_tilde[ir], omega_tilde[ir], Ve[ir], phi0[ir], phi1[ir])
-        S = stability_matrix(S_nok, mu_tilde, k)
-        print("S:",np.shape(S))
 
-        # get eigenvalues
-        eigenvalues.append(scipy.linalg.eigvals(S))
+        # loop over k points. Temporary stupid k list.
+        eigenvalues_thisr = []
+        for kp in np.ones(2)*k:
+            eigenvalues_thisr.append(eigenvalues_single_k(kp))
+        eigenvalues.append(eigenvalues_thisr)
+        
         end = time.time()
         print("Time elapsed for ir =",ir,":",end-start, "sec.")
         print(eigenvalues[-1])
