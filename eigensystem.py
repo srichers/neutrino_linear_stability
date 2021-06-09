@@ -40,6 +40,23 @@ dm2 = 2.4e-3 * eV**2 # erg
 k = 1.088e-18 # erg
 ir = 254
 
+#===============#
+# read the file #
+#===============#
+def read_data(filename):
+    fin  = h5py.File(input_filename,"r")
+
+    mugrid = np.array(fin["distribution_costheta_grid(lab)"])
+    mumid = np.array(fin["distribution_costheta_mid(lab)"])
+    dist = np.array(fin["distribution(erg|ccm,lab)"])
+    rho = np.array(fin["rho(g|ccm,com)"])
+    Ye = np.array(fin["Ye"])
+    frequency = np.array(fin["distribution_frequency_mid(Hz,lab)"])
+    
+    fin.close()
+
+    return mugrid, mumid, frequency, dist, rho, Ye
+
 #=========================#
 # construct tilde vectors #
 #=========================#
@@ -93,15 +110,9 @@ def single_file(input_filename):
     output_filename = input_filename.strip(".h5") + "_"+str(target_resolution)+".h5"
     print("Creating", output_filename)
 
-    fin  = h5py.File(input_filename,"r")
-
-    #==================#
-    # get the old data #
-    #==================#
-    old_mugrid = np.array(fin["distribution_costheta_grid(lab)"])
-    old_mumid = np.array(fin["distribution_costheta_mid(lab)"])
-    old_nmu = len(old_mugrid)-1
-    old_dist = np.array(fin["distribution(erg|ccm,lab)"])
+    # read in data and calculate moments
+    old_mugrid, old_mumid, frequency, old_dist, rho, Ye = read_data(input_filename)
+    old_nmu = len(old_mumid)
     old_edens = np.sum(old_dist,\
                        axis=(1,2,3,4))
     old_flux  = np.sum(old_dist * old_mumid[np.newaxis,np.newaxis,np.newaxis,:,np.newaxis]   ,\
@@ -156,7 +167,7 @@ def single_file(input_filename):
     #===============================#
     # integrate over energy and phi #
     #===============================#
-    neutrino_energy_mid = h * np.array(fin["distribution_frequency_mid(Hz,lab)"])
+    neutrino_energy_mid = h * frequency
     number_dist = np.sum(new_dist / neutrino_energy_mid[np.newaxis,np.newaxis,:,np.newaxis,np.newaxis],\
                          axis=(2,4))
     number_dist[:,2,:] /= 4. # heavy lepton distribution represents mu,tau,mubar,taubar
@@ -184,7 +195,7 @@ def single_file(input_filename):
     #======================#
     # get vmatter and phis #
     #======================#
-    Ve = np.sqrt(2.) * GF * np.array(fin["rho(g|ccm,com)"]) * np.array(fin["Ye"]) / Mp
+    Ve = np.sqrt(2.) * GF * rho * Ye / Mp
     M0 = np.sqrt(2.) * GF * np.sum(number_dist, axis=2)
     M1 = np.sqrt(2.) * GF * np.sum(number_dist * new_mumid, axis=2)
     phi0 = (M0[:,0] - M0[:,2]) - (M0[:,1] - M0[:,2])
