@@ -38,7 +38,8 @@ target_resolution = 20
 input_filename = "lotsadata/original_data_DO/15Msun_400ms_DO.h5"
 dm2 = 2.4e-3 * eV**2 # erg
 k = 1.088e-18 # erg
-ir = 254
+ir_start = 254
+ir_stop = 254
 
 #===============#
 # read the file #
@@ -207,22 +208,22 @@ def single_file(input_filename):
     phi0 = (M0[:,0] - M0[:,2]) - (M0[:,1] - M0[:,2])
     phi1 = (M1[:,0] - M1[:,2]) - (M1[:,1] - M1[:,2])
     print("phi0:",np.shape(phi0))
-    
-    #============================#
-    # construct stability matrix #
-    #============================#
-    omega_tilde, mu_tilde, n_tilde = construct_tilde_vectors(mumid, dm2, average_energy, number_dist)
-    S_nok = stability_matrix_nok(mu_tilde, n_tilde[ir], omega_tilde[ir], Ve[ir], phi0[ir], phi1[ir])
-    S = stability_matrix(S_nok, mu_tilde, k)
-    print("S:",np.shape(S))
 
-    #=================#
-    # get eigenvalues #
-    #=================#
-    start = time.time()
-    evals = scipy.linalg.eigvals(S)
-    end = time.time()
-    print("Time elapsed:",end-start)
-    print(evals)
+    # construct tilde vectors
+    omega_tilde, mu_tilde, n_tilde = construct_tilde_vectors(mumid, dm2, average_energy, number_dist)
+
+    ir_list = range(ir_start, ir_stop+1)
+    for ir in ir_list:
+        start = time.time()
+        # construct stability matrix
+        S_nok = stability_matrix_nok(mu_tilde, n_tilde[ir], omega_tilde[ir], Ve[ir], phi0[ir], phi1[ir])
+        S = stability_matrix(S_nok, mu_tilde, k)
+        print("S:",np.shape(S))
+
+        # get eigenvalues
+        evals = scipy.linalg.eigvals(S)
+        end = time.time()
+        print("Time elapsed for ir =",ir,":",end-start, "sec.")
+        print(evals)
 
 single_file(input_filename)
