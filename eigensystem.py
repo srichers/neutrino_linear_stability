@@ -40,6 +40,24 @@ dm2 = 2.4e-3 * eV**2 # erg
 k = 1.088e-18 # erg
 ir = 254
 
+#=========================#
+# construct tilde vectors #
+#=========================#
+def construct_tilde_vectors(mumid, dm2, average_energy, number_dist):
+    omega = np.ones(len(mumid))[np.newaxis,:] * (dm2 / (2.*average_energy))[:,np.newaxis]
+    omega_tilde = np.concatenate((-omega, omega), axis=1)
+    print("omega_tilde:",np.shape(omega_tilde))
+
+    mu_tilde = np.concatenate((mumid, mumid))
+    print("mu_tilde:",np.shape(mu_tilde))
+    
+    n_nu    = number_dist[:,0,:] - number_dist[:,2,:]
+    n_nubar = number_dist[:,1,:] - number_dist[:,2,:]
+    n_tilde = np.concatenate((n_nu, -n_nubar), axis=1)
+    print("n_tilde:",np.shape(n_tilde))
+
+    return omega_tilde, mu_tilde, n_tilde
+
 def stability_matrix_nok(mu_tilde,n_tilde,omega_tilde, Ve, phi0, phi1):
     matrix_size = len(mu_tilde)
 
@@ -163,21 +181,6 @@ def single_file(input_filename):
     average_energy = new_edens / new_ndens
     print("average_energy:",np.min(average_energy)/MeV, np.max(average_energy)/MeV)
 
-    #=========================#
-    # construct tilde vectors #
-    #=========================#
-    omega = np.ones(new_nmu)[np.newaxis,:] * (dm2 / (2.*average_energy))[:,np.newaxis]
-    omega_tilde = np.concatenate((-omega, omega), axis=1)
-    print("omega_tilde:",np.shape(omega_tilde))
-
-    mu_tilde = np.concatenate((new_mumid, new_mumid))
-    print("mu_tilde:",np.shape(mu_tilde))
-    
-    n_nu    = number_dist[:,0,:] - number_dist[:,2,:]
-    n_nubar = number_dist[:,1,:] - number_dist[:,2,:]
-    n_tilde = np.concatenate((n_nu, -n_nubar), axis=1)
-    print("n_tilde:",np.shape(n_tilde))
-
     #======================#
     # get vmatter and phis #
     #======================#
@@ -191,6 +194,7 @@ def single_file(input_filename):
     #============================#
     # construct stability matrix #
     #============================#
+    omega_tilde, mu_tilde, n_tilde = construct_tilde_vectors(new_mumid, dm2, average_energy, number_dist)
     S_nok = stability_matrix_nok(mu_tilde, n_tilde[ir], omega_tilde[ir], Ve[ir], phi0[ir], phi1[ir])
     S = stability_matrix(S_nok, mu_tilde, k)
     print("S:",np.shape(S))
