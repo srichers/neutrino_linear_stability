@@ -55,6 +55,12 @@ def read_data(filename):
     
     fin.close()
 
+    # sum over phi because we don't need it
+    dist = np.sum(dist, axis=4)
+    
+    # heavy lepton distribution represents mu,tau,mubar,taubar
+    dist[:,2,:,:] /= 4. 
+
     return mugrid, mumid, frequency, dist, rho, Ye
 
 #=========================#
@@ -63,12 +69,9 @@ def read_data(filename):
 def refine_distribution(old_mugrid, old_mumid, old_dist, target_resolution):
     # store moments for comparison
     old_nmu = len(old_mumid)
-    old_edens = np.sum(old_dist,\
-                       axis=(1,2,3,4))
-    old_flux  = np.sum(old_dist * old_mumid[np.newaxis,np.newaxis,np.newaxis,:,np.newaxis]   ,\
-                       axis=(1,2,3,4))
-    old_press = np.sum(old_dist * old_mumid[np.newaxis,np.newaxis,np.newaxis,:,np.newaxis]**2,\
-                       axis=(1,2,3,4))
+    old_edens = np.sum(old_dist               , axis=(1,2,3))
+    old_flux  = np.sum(old_dist * old_mumid   , axis=(1,2,3))
+    old_press = np.sum(old_dist * old_mumid**2, axis=(1,2,3))
 
     # initially set to old values in case not refining
     new_mugrid = old_mugrid
@@ -98,22 +101,19 @@ def refine_distribution(old_mugrid, old_mumid, old_dist, target_resolution):
         nr = old_dist.shape[0]
         ns = old_dist.shape[1]
         ne = old_dist.shape[2]
-        nphi = old_dist.shape[4]
         
-        new_dist = np.zeros((nr,ns,ne,new_nmu,nphi))
+        new_dist = np.zeros((nr,ns,ne,new_nmu))
         for i in range(old_nmu):
-            new_dist[:,:,:,2*i+0,:] = old_dist[:,:,:,i,:]/2.
-            new_dist[:,:,:,2*i+1,:] = old_dist[:,:,:,i,:]/2.
+            new_dist[:,:,:,2*i+0] = old_dist[:,:,:,i]/2.
+            new_dist[:,:,:,2*i+1] = old_dist[:,:,:,i]/2.
 
     # new grid structure #
     new_mumid = np.array([0.5*(new_mugrid[i]+new_mugrid[i+1]) for i in range(new_nmu)])
 
     # calculate error in moments #
-    new_edens = np.sum(new_dist,axis=(1,2,3,4))
-    new_flux  = np.sum(new_dist * new_mumid[np.newaxis,np.newaxis,np.newaxis,:,np.newaxis] ,\
-                       axis=(1,2,3,4))
-    new_press = np.sum(new_dist * new_mumid[np.newaxis,np.newaxis,np.newaxis,:,np.newaxis]**2,\
-                       axis=(1,2,3,4))
+    new_edens = np.sum(new_dist               , axis=(1,2,3))
+    new_flux  = np.sum(new_dist * new_mumid   , axis=(1,2,3))
+    new_press = np.sum(new_dist * new_mumid**2, axis=(1,2,3))
     print("Max relative error in net energy density:", np.max(np.abs((new_edens-old_edens)/old_edens)))
     print("Max relative error in net flux:", np.max(np.abs((new_flux-old_flux)/old_edens)))
     print("Max relative error in net pressure:", np.max(np.abs((new_press-old_press)/old_edens)))
@@ -186,19 +186,18 @@ def single_file(input_filename):
     # refine distribution
     mugrid, mumid, dist = refine_distribution(mugrid, mumid, dist, target_resolution)
     
-    #===============================#
-    # integrate over energy and phi #
-    #===============================#
+    #=======================#
+    # integrate over energy #
+    #=======================#
     neutrino_energy_mid = h * frequency
-    number_dist = np.sum(dist / neutrino_energy_mid[np.newaxis,np.newaxis,:,np.newaxis,np.newaxis],\
-                         axis=(2,4))
-    number_dist[:,2,:] /= 4. # heavy lepton distribution represents mu,tau,mubar,taubar
+    number_dist = np.sum(dist / neutrino_energy_mid[np.newaxis,np.newaxis,:,np.newaxis],\
+                         axis=(2))
     print("number_dist:",np.shape(number_dist))
     
     #==========================#
     # calculate average energy #
     #==========================#
-    edens = np.sum(dist,axis=(1,2,3,4))
+    edens = np.sum(dist,axis=(1,2,3))
     ndens = np.sum(number_dist,axis=(1,2))
     average_energy = edens / ndens
     print("average_energy:",np.min(average_energy)/MeV, np.max(average_energy)/MeV)
