@@ -75,6 +75,9 @@ def construct_tilde_vectors(mumid, dm2, average_energy, number_dist):
 
     return omega_tilde, mu_tilde, n_tilde
 
+#===========================================#
+# construct stability matrix without k term #
+#===========================================#
 def stability_matrix_nok(mu_tilde,n_tilde,omega_tilde, Ve, phi0, phi1):
     matrix_size = len(mu_tilde)
 
@@ -94,6 +97,9 @@ def stability_matrix_nok(mu_tilde,n_tilde,omega_tilde, Ve, phi0, phi1):
 
     return S_nok
 
+#=================================#
+# construct full stability matrix #
+#=================================#
 def stability_matrix(S_nok, mu_tilde, k):
     matrix_size = len(mu_tilde)
             
