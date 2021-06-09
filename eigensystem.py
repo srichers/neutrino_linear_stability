@@ -181,14 +181,16 @@ def single_file(input_filename):
     print("Creating", output_filename)
 
     # read in data and calculate moments
-    old_mugrid, old_mumid, frequency, old_dist, rho, Ye = read_data(input_filename)
-    new_mugrid, new_mumid, new_dist = refine_distribution(old_mugrid, old_mumid, old_dist, target_resolution)
+    mugrid, mumid, frequency, dist, rho, Ye = read_data(input_filename)
+
+    # refine distribution
+    mugrid, mumid, dist = refine_distribution(mugrid, mumid, dist, target_resolution)
     
     #===============================#
     # integrate over energy and phi #
     #===============================#
     neutrino_energy_mid = h * frequency
-    number_dist = np.sum(new_dist / neutrino_energy_mid[np.newaxis,np.newaxis,:,np.newaxis,np.newaxis],\
+    number_dist = np.sum(dist / neutrino_energy_mid[np.newaxis,np.newaxis,:,np.newaxis,np.newaxis],\
                          axis=(2,4))
     number_dist[:,2,:] /= 4. # heavy lepton distribution represents mu,tau,mubar,taubar
     print("number_dist:",np.shape(number_dist))
@@ -196,9 +198,9 @@ def single_file(input_filename):
     #==========================#
     # calculate average energy #
     #==========================#
-    new_edens = np.sum(new_dist,axis=(1,2,3,4))
-    new_ndens = np.sum(number_dist,axis=(1,2))
-    average_energy = new_edens / new_ndens
+    edens = np.sum(dist,axis=(1,2,3,4))
+    ndens = np.sum(number_dist,axis=(1,2))
+    average_energy = edens / ndens
     print("average_energy:",np.min(average_energy)/MeV, np.max(average_energy)/MeV)
 
     #======================#
@@ -206,7 +208,7 @@ def single_file(input_filename):
     #======================#
     Ve = np.sqrt(2.) * GF * rho * Ye / Mp
     M0 = np.sqrt(2.) * GF * np.sum(number_dist, axis=2)
-    M1 = np.sqrt(2.) * GF * np.sum(number_dist * new_mumid, axis=2)
+    M1 = np.sqrt(2.) * GF * np.sum(number_dist * mumid, axis=2)
     phi0 = (M0[:,0] - M0[:,2]) - (M0[:,1] - M0[:,2])
     phi1 = (M1[:,0] - M1[:,2]) - (M1[:,1] - M1[:,2])
     print("phi0:",np.shape(phi0))
@@ -214,7 +216,7 @@ def single_file(input_filename):
     #============================#
     # construct stability matrix #
     #============================#
-    omega_tilde, mu_tilde, n_tilde = construct_tilde_vectors(new_mumid, dm2, average_energy, number_dist)
+    omega_tilde, mu_tilde, n_tilde = construct_tilde_vectors(mumid, dm2, average_energy, number_dist)
     S_nok = stability_matrix_nok(mu_tilde, n_tilde[ir], omega_tilde[ir], Ve[ir], phi0[ir], phi1[ir])
     S = stability_matrix(S_nok, mu_tilde, k)
     print("S:",np.shape(S))
