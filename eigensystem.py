@@ -39,7 +39,7 @@ input_filename = "lotsadata/original_data_DO/15Msun_400ms_DO.h5"
 dm2 = 2.4e-3 * eV**2 # erg
 k = 1.088e-18 # erg
 ir_start = 254
-ir_stop = 254
+ir_stop = 255
 
 #===============#
 # read the file #
@@ -213,6 +213,7 @@ def single_file(input_filename):
     omega_tilde, mu_tilde, n_tilde = construct_tilde_vectors(mumid, dm2, average_energy, number_dist)
 
     ir_list = range(ir_start, ir_stop+1)
+    eigenvalues = []
     for ir in ir_list:
         start = time.time()
         # construct stability matrix
@@ -221,9 +222,25 @@ def single_file(input_filename):
         print("S:",np.shape(S))
 
         # get eigenvalues
-        evals = scipy.linalg.eigvals(S)
+        eigenvalues.append(scipy.linalg.eigvals(S))
         end = time.time()
         print("Time elapsed for ir =",ir,":",end-start, "sec.")
-        print(evals)
+        print(eigenvalues[-1])
+
+    # output data
+    output_filename = input_filename[:-3]+"_eigenvalues.h5"
+    print("Writing",output_filename)
+    fout = h5py.File(output_filename, "w")
+    fout["Ve (erg)"] = Ve
+    fout["phi0 (erg)"] = phi0
+    fout["phi1 (erg)"] = phi1
+    fout["omega_tilde (erg)"] = omega_tilde
+    fout["mu_tilde"] = mu_tilde
+    fout["n_tilde"] = n_tilde
+    fout["ir (base 0)"] = ir_list
+    fout["ir (base 1)"] = [ir+1 for ir in ir_list]
+    fout["number_dist (1|ccm)"] = number_dist
+    fout["eigenvalues (erg)"] = eigenvalues
+    fout.close()
 
 single_file(input_filename)
