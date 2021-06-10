@@ -28,6 +28,9 @@ import multiprocessing as mp
 import discrete_ordinates
 import minerbo
 
+#===========#
+# constants #
+#===========#
 h = 6.6260755e-27 # erg s
 hbar = h/(2.*np.pi)
 c = 2.99792458e10 # cm/s
@@ -37,7 +40,9 @@ GF_GeV2 = 1.1663787e-5 # GeV^-2
 GF = GF_GeV2 / (1000*MeV)**2 * (hbar*c)**3
 Mp = 1.6726219e-24
 
+#========#
 # inputs #
+#========#
 target_resolution = 20
 input_filename = "lotsadata/original_data_DO/15Msun_400ms_DO.h5"
 dm2 = 2.4e-3 * eV**2 # erg
@@ -48,16 +53,6 @@ numb_k = 10
 min_ktarget_multiplier = 1e-3
 max_ktarget_multiplier = 1e1
 distribution_interpolator = "Minerbo" # "DO" or "Minerbo"
-
-# set up global shared memory
-S_nok_RA = mp.RawArray('d',(target_resolution*2)**2)
-mu_tilde_RA= mp.RawArray('d', target_resolution*2)
-
-def get_shared_numpy_arrays():
-    # create numpy object from shared RawArray memory for easy reading
-    S_nok = np.frombuffer(S_nok_RA).reshape((target_resolution*2,target_resolution*2))
-    mu_tilde = np.frombuffer(mu_tilde_RA)
-    return S_nok, mu_tilde
 
 #===============#
 # read the file #
@@ -82,6 +77,9 @@ def read_data(filename):
 
     return mugrid, mumid, frequency, dist, rho, Ye
 
+#===========================================#
+# build array of k values to be looped over #
+#===========================================#
 def build_k_grid(k_target,numb_k,min_ktarget_multiplier,max_ktarget_multiplier):
     #make log spaced array for positive values of k_target
     k_grid_pos = k_target * np.geomspace(min_ktarget_multiplier,max_ktarget_multiplier,num=numb_k,endpoint=True)
@@ -89,7 +87,6 @@ def build_k_grid(k_target,numb_k,min_ktarget_multiplier,max_ktarget_multiplier):
     #join into single array
     k_grid=np.concatenate((-np.flip(k_grid_pos),[0],k_grid_pos),axis=0)
     return k_grid
-
 
 
 #=========================#
@@ -153,11 +150,30 @@ def stability_matrix(k):
 
     return S
 
+#=============================#
+# set up global shared memory #
+#=============================#
+S_nok_RA = mp.RawArray('d',(target_resolution*2)**2)
+mu_tilde_RA= mp.RawArray('d', target_resolution*2)
+def get_shared_numpy_arrays():
+    # create numpy object from shared RawArray memory for easy reading
+    S_nok = np.frombuffer(S_nok_RA).reshape((target_resolution*2,target_resolution*2))
+    mu_tilde = np.frombuffer(mu_tilde_RA)
+    return S_nok, mu_tilde
+pool = mp.Pool(nthreads)
+
+#===========================================#
+# do all eigenvalue calculations for a file #
+#===========================================#
 def single_file(input_filename):
-    # read in data and calculate moments
+    #----------
+    # read in data
+    #----------
     mugrid, mumid, frequency, dist, rho, Ye = read_data(input_filename)
 
+    #----------
     # refine distribution
+    #----------
     if distribution_interpolator == "DO":
         mugrid, mumid, dist = discrete_ordinates.refine_distribution(mugrid, mumid, dist, target_resolution)
     elif distribution_interpolator == "Minerbo":
@@ -165,53 +181,61 @@ def single_file(input_filename):
     else:
         print("Error: "+distribution_interpolator+"not found!")
         
-    #=======================#
-    # integrate over energy #
-    #=======================#
+    #----------
+    # integrate over energy
+    #----------
     neutrino_energy_mid = h * frequency
     number_dist = np.sum(dist / neutrino_energy_mid[np.newaxis,np.newaxis,:,np.newaxis],\
                          axis=(2))
     print("number_dist shape:",np.shape(number_dist))
     
-    #==========================#
-    # calculate average energy #
-    #==========================#
+    #----------
+    # calculate average energy
+    #----------
     edens = np.sum(dist,axis=(1,2,3))
     ndens = np.sum(number_dist,axis=(1,2))
     average_energy = edens / ndens
 
-    #======================#
-    # get vmatter and phis #
-    #======================#
+    #----------
+    # get vmatter and phis
+    #----------
     Ve = np.sqrt(2.) * GF * rho * Ye / Mp
     M0 = np.sqrt(2.) * GF * np.sum(number_dist, axis=2)
     M1 = np.sqrt(2.) * GF * np.sum(number_dist * mumid, axis=2)
     phi0 = (M0[:,0] - M0[:,2]) - (M0[:,1] - M0[:,2])
     phi1 = (M1[:,0] - M1[:,2]) - (M1[:,1] - M1[:,2])
 
-    # get processors ready
-    pool = mp.Pool(nthreads)
-
+    #----------
     # construct tilde vectors
+    #----------
     # use copyto to keep mu_tilde pointing at the shared buffer
     omega_tilde, n_tilde = construct_tilde_vectors(mumid, dm2, average_energy, number_dist)
 
+    #----------
     # loop over radii
+    #----------
     ir_list = range(ir_start, ir_stop+1)
     eigenvalues = []
     kgrid_list = []
     for ir in ir_list:
         start = time.time()
 
+        #----------
         # construct stability matrix
+        #----------
         set_stability_matrix_nok(n_tilde[ir], omega_tilde[ir], Ve[ir], phi0[ir], phi1[ir])
 
-        # loop over k points. Temporary stupid k list.
+        #----------
+        # loop over k points
+        #----------
         kgrid = build_k_grid(phi0[ir], numb_k, min_ktarget_multiplier, max_ktarget_multiplier)
         eigenvalues_thisr = pool.map(eigenvalues_single_k, kgrid)
         eigenvalues.append(eigenvalues_thisr)
         kgrid_list.append(kgrid)
         
+        #----------
+        # write info to screen
+        #----------
         end = time.time()
         print(" ir="+str(ir),
               " time="+"{:.2e}".format(end-start)+"s.",
@@ -222,17 +246,23 @@ def single_file(input_filename):
               " minI="+"{:.2e}".format(np.min(np.imag(eigenvalues_thisr))),
               " maxI="+"{:.2e}".format(np.max(np.imag(eigenvalues_thisr))))
 
+    #----------
     # get mu_tilde for output
+    #----------
     S_nok, mu_tilde = get_shared_numpy_arrays()
 
+    #----------
     # set output filename
+    #----------
     output_filename = input_filename[:-3]
     output_filename += "_dm"+"{:.2e}".format(dm2/eV**2)
     output_filename += "_"+distribution_interpolator
     output_filename += "_eigenvalues.h5"
     print("Writing",output_filename)
 
+    #----------
     # output data
+    #----------
     fout = h5py.File(output_filename, "w")
     fout["Ve (erg)"] = Ve
     fout["phi0 (erg)"] = phi0
