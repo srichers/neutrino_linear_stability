@@ -39,13 +39,13 @@ Mp = 1.6726219e-24
 target_resolution = 20
 input_filename = "lotsadata/original_data_DO/15Msun_400ms_DO.h5"
 dm2 = 2.4e-3 * eV**2 # erg
-k = 1.088e-18 # erg
 ir_start = 254
 ir_stop = 255
 nthreads = 2
 numb_k = 10
 min_ktarget_multiplier = 1e-3
 max_ktarget_multiplier = 1e1
+distribution_interpolator = "DO" # currently does nothing
 
 # set up global shared memory
 S_nok_RA = mp.RawArray('d',(target_resolution*2)**2)
@@ -273,10 +273,17 @@ def single_file(input_filename):
         end = time.time()
         print("Time elapsed for ir =",ir,":",end-start, "sec.")
 
-    # output data
+    # get mu_tilde for output
     S_nok, mu_tilde = get_shared_numpy_arrays()
-    output_filename = input_filename[:-3]+"_eigenvalues.h5"
+
+    # set output filename
+    output_filename = input_filename[:-3]
+    output_filename += "_dm"+"{:.2e}".format(dm2/eV**2)
+    output_filename += "_"+distribution_interpolator
+    output_filename += "_eigenvalues.h5"
     print("Writing",output_filename)
+
+    # output data
     fout = h5py.File(output_filename, "w")
     fout["Ve (erg)"] = Ve
     fout["phi0 (erg)"] = phi0
