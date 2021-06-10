@@ -32,13 +32,13 @@ import minerbo
 # constants #
 #===========#
 h = 6.6260755e-27 # erg s
-hbar = h/(2.*np.pi)
+hbar = h/(2.*np.pi) # erg s
 c = 2.99792458e10 # cm/s
 MeV = 1.60218e-6 # erg
 eV = MeV/1e6 # erg
 GF_GeV2 = 1.1663787e-5 # GeV^-2
-GF = GF_GeV2 / (1000*MeV)**2 * (hbar*c)**3
-Mp = 1.6726219e-24
+GF = GF_GeV2 / (1000*MeV)**2 * (hbar*c)**3 # erg cm^3
+Mp = 1.6726219e-24 # g
 
 #========#
 # inputs #
@@ -80,6 +80,7 @@ def read_data(filename):
 #===========================================#
 # build array of k values to be looped over #
 #===========================================#
+# input/output units of ergs
 def build_k_grid(k_target,numb_k,min_ktarget_multiplier,max_ktarget_multiplier):
     #make log spaced array for positive values of k_target
     k_grid_pos = k_target * np.geomspace(min_ktarget_multiplier,max_ktarget_multiplier,num=numb_k,endpoint=True)
@@ -95,12 +96,14 @@ def build_k_grid(k_target,numb_k,min_ktarget_multiplier,max_ktarget_multiplier):
 def construct_tilde_vectors(mumid, dm2, average_energy, number_dist):
     S_nok, mu_tilde = get_shared_numpy_arrays()
 
+    # omega_tilde (erg)
     omega = np.ones(len(mumid))[np.newaxis,:] * (dm2 / (2.*average_energy))[:,np.newaxis]
     omega_tilde = np.concatenate((-omega, omega), axis=1)
 
-    # set global mu_tilde
+    # set global mu_tilde (dimensionless)
     np.copyto(mu_tilde, np.concatenate((mumid, mumid)))
-    
+
+    # n_tilde (cm^-3)
     n_nu    = number_dist[:,0,:] - number_dist[:,2,:]
     n_nubar = number_dist[:,1,:] - number_dist[:,2,:]
     n_tilde = np.concatenate((n_nu, -n_nubar), axis=1)
@@ -110,6 +113,7 @@ def construct_tilde_vectors(mumid, dm2, average_energy, number_dist):
 #===========================================#
 # construct stability matrix without k term #
 #===========================================#
+# n_tilde:cm^-3 omega_tilde:erg Ve:erg phi:erg output:erg
 def set_stability_matrix_nok(n_tilde,omega_tilde, Ve, phi0, phi1):
     S_nok, mu_tilde = get_shared_numpy_arrays()
     matrix_size = len(mu_tilde)
@@ -129,6 +133,7 @@ def set_stability_matrix_nok(n_tilde,omega_tilde, Ve, phi0, phi1):
 #=================================#
 # do the real work for a single k #
 #=================================#
+# k:erg output:erg
 def eigenvalues_single_k(k):
     # complete the stability matrix
     S = stability_matrix(k)
@@ -139,6 +144,7 @@ def eigenvalues_single_k(k):
 #=================================#
 # construct full stability matrix #
 #=================================#
+# k:erg output:erg
 def stability_matrix(k):
     S_nok, mu_tilde = get_shared_numpy_arrays()
     matrix_size = len(mu_tilde)
