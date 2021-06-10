@@ -43,6 +43,9 @@ k = 1.088e-18 # erg
 ir_start = 254
 ir_stop = 255
 nthreads = 2
+numb_k = 10
+min_ktarget_multiplier = 1e-3
+max_ktarget_multiplier = 1e1
 
 # set up global shared memory
 S_nok_RA = mp.RawArray('d',(target_resolution*2)**2)
@@ -77,22 +80,14 @@ def read_data(filename):
 
     return mugrid, mumid, frequency, dist, rho, Ye
 
-def build_k_grid(n_nu,n_nubar,numb_k,min_multiplier,max_multiplier):
-    #multipliers set the range away from k_target that the grid should begin/end.
-    #Target k is based on the 'total' self-interaction at this radius
-    k_target = np.sqrt(2.) * GF * (n_nu-n_nubar)
+def build_k_grid(k_target,numb_k,min_ktarget_multiplier,max_ktarget_multiplier):
     #make log spaced array for positive values of k_target
-    k_grid_pos=np.geomspace(min_multiplier*k_target,max_multiplier*k_target,num=numb_k,endpoint=True)
-    #repeat for negative values of k_target
-    k_grid_neg=np.geomspace(-min_multiplier*k_target,-max_multiplier*k_target,num=numb_k,endpoint=True)
+    k_grid_pos = k_target * np.geomspace(min_ktarget_multiplier,max_ktarget_multiplier,num=numb_k,endpoint=True)
+
     #join into single array
-    k_grid=np.concatenate((k_grid_pos,k_grid_neg),axis=0)
+    k_grid=np.concatenate((-np.flip(k_grid_pos),[0],k_grid_pos),axis=0)
+    print(k_grid)
     return k_grid
-   #SDF: Later, I would like to make this grid truly log spaces about the target, 
-   # i.e. log spaced out in both directions away from k_target, as below.
-   #k_upper=np.logspace(ktarget,ktarget*max_multiplier,num=numb_k,endpoint=True,base=np.exp(1))
-   # k_lower=np.logspace(ktarget,ktarget*min_multiplier,num=numb_k,endpoint=True,base=np.exp(1))
-   #k_grid=np.concatenate[(k_grid_lower,k_grid_upper),axis=0]
 
 
 #=========================#
@@ -216,7 +211,6 @@ def stability_matrix(k):
     S = copy.deepcopy(S_nok)
     for i in range(matrix_size):
         S[i,i] += mu_tilde[i]*k
-    print("after k:",np.min(S),np.max(S))
 
     return S
 
@@ -270,13 +264,12 @@ def single_file(input_filename):
         set_stability_matrix_nok(n_tilde[ir], omega_tilde[ir], Ve[ir], phi0[ir], phi1[ir])
 
         # loop over k points. Temporary stupid k list.
-        klist = np.arange(3)*k
+        klist = build_k_grid(phi0[ir], numb_k, min_ktarget_multiplier, max_ktarget_multiplier)
         eigenvalues_thisr = pool.map(eigenvalues_single_k, klist)
         eigenvalues.append(eigenvalues_thisr)
         
         end = time.time()
         print("Time elapsed for ir =",ir,":",end-start, "sec.")
-        print(eigenvalues[-1])
 
     # output data
     S_nok, mu_tilde = get_shared_numpy_arrays()
