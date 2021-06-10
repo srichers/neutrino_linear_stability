@@ -114,8 +114,8 @@ Mp = 1.6726219e-24
 
 # inputs #
 target_resolution = 20
-input_filename = "../FFO Data/FFO Run Me/15Msun_400ms_DO.h5"
-#"lotsadata/original_data_DO/15Msun_400ms_DO.h5"
+input_filename = "lotsadata/original_data_DO/15Msun_400ms_DO.h5"
+#SDF path "../FFO Data/FFO Run Me/15Msun_400ms_DO.h5"
 dm2 = 2.4e-3 * eV**2 # erg
 k = 1.088e-18 # erg
 ir = 254
