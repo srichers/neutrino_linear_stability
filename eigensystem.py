@@ -218,7 +218,13 @@ def single_file(input_filename):
         kgrid_list.append(kgrid)
         
         end = time.time()
-        print("Time elapsed for ir =",ir,":",end-start, "sec.")
+        print(" ir="+str(ir),
+              " time="+"{:.2e}".format(end-start)+"s.",
+              " ktarget="+"{:.2e}".format(phi0[ir]),
+              " minReal="+"{:.2e}".format(np.min(np.real(eigenvalues_thisr))),
+              " maxReal="+"{:.2e}".format(np.max(np.real(eigenvalues_thisr))),
+              " minImag="+"{:.2e}".format(np.min(np.imag(eigenvalues_thisr))),
+              " maxImag="+"{:.2e}".format(np.max(np.imag(eigenvalues_thisr))))
 
     # get mu_tilde for output
     S_nok, mu_tilde = get_shared_numpy_arrays()
