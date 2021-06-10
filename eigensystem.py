@@ -70,10 +70,8 @@ def stability_matrix(S_nok, mu_tilde, k):
 
     return S
 
-def build_k_grid(n_nu,n_nubar,numb_k):
+def build_k_grid(n_nu,n_nubar,numb_k,max_multiplier,min_multiplier):
     #multipliers set the range away from k_target that the grid should begin/end.
-    max_multiplier=100
-    min_multiplier=0.001
     #Target k is based on the 'total' self-interaction at this radius
     k_target = np.sqrt(2.) * GF * (n_nu-n_nubar)
     print("k_target=" ,k_target)
