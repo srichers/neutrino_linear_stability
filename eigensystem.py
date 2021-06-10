@@ -24,6 +24,7 @@ import sys
 import glob
 import scipy.linalg
 import copy
+import multiprocessing as mp
 
 h = 6.6260755e-27 # erg s
 hbar = h/(2.*np.pi)
@@ -41,6 +42,17 @@ dm2 = 2.4e-3 * eV**2 # erg
 k = 1.088e-18 # erg
 ir_start = 254
 ir_stop = 255
+nthreads = 2
+
+# set up global shared memory
+S_nok_RA = mp.RawArray('d',(target_resolution*2)**2)
+mu_tilde_RA= mp.RawArray('d', target_resolution*2)
+
+def get_shared_numpy_arrays():
+    # create numpy object from shared RawArray memory for easy reading
+    S_nok = np.frombuffer(S_nok_RA).reshape((target_resolution*2,target_resolution*2))
+    mu_tilde = np.frombuffer(mu_tilde_RA)
+    return S_nok, mu_tilde
 
 #===============#
 # read the file #
@@ -127,11 +139,14 @@ def refine_distribution(old_mugrid, old_mumid, old_dist, target_resolution):
 # construct tilde vectors #
 #=========================#
 def construct_tilde_vectors(mumid, dm2, average_energy, number_dist):
+    S_nok, mu_tilde = get_shared_numpy_arrays()
+
     omega = np.ones(len(mumid))[np.newaxis,:] * (dm2 / (2.*average_energy))[:,np.newaxis]
     omega_tilde = np.concatenate((-omega, omega), axis=1)
     print("omega_tilde:",np.shape(omega_tilde))
 
-    mu_tilde = np.concatenate((mumid, mumid))
+    # set global mu_tilde
+    np.copyto(mu_tilde, np.concatenate((mumid, mumid)))
     print("mu_tilde:",np.shape(mu_tilde))
     
     n_nu    = number_dist[:,0,:] - number_dist[:,2,:]
@@ -139,42 +154,44 @@ def construct_tilde_vectors(mumid, dm2, average_energy, number_dist):
     n_tilde = np.concatenate((n_nu, -n_nubar), axis=1)
     print("n_tilde:",np.shape(n_tilde))
 
-    return omega_tilde, mu_tilde, n_tilde
+    return omega_tilde, n_tilde
 
 #===========================================#
 # construct stability matrix without k term #
 #===========================================#
-def stability_matrix_nok(mu_tilde,n_tilde,omega_tilde, Ve, phi0, phi1):
+def set_stability_matrix_nok(n_tilde,omega_tilde, Ve, phi0, phi1):
+    S_nok, mu_tilde = get_shared_numpy_arrays()
     matrix_size = len(mu_tilde)
 
-    # self-interaction part
-    S_nok = -np.sqrt(2) * GF * np.array([[
-        (1.0 - mu_tilde[i]*mu_tilde[j])*n_tilde[j]
-        for j in range(matrix_size)] for i in range(matrix_size)])
-    print("after SI:",np.min(S_nok),np.max(S_nok))
-    
-    # vacuum and phis
     for i in range(matrix_size):
+        # self-interaction part
+        S_nok[i,:] = -np.sqrt(2) * GF * np.array([
+            (1.0 - mu_tilde[i]*mu_tilde[j])*n_tilde[j]
+            for j in range(matrix_size)])
+        
+        # vacuum and phis
         S_nok[i,i] += omega_tilde[i] \
             + Ve \
             + phi0 \
             - mu_tilde[i]*phi1
-    print("after vac/matter:",np.min(S_nok),np.max(S_nok))
 
-    return S_nok
+    print("after vac/matter:",np.min(S_nok),np.max(S_nok))
 
 #=================================#
 # do the real work for a single k #
 #=================================#
 def eigenvalues_single_k(k):
-    S = stability_matrix(S_nok, mu_tilde, k)
-    return scipy.linalg.eigvals(S)
+    # complete the stability matrix
+    S = stability_matrix(k)
 
+    # find the eigenvalues
+    return scipy.linalg.eigvals(S)
 
 #=================================#
 # construct full stability matrix #
 #=================================#
-def stability_matrix(S_nok, mu_tilde, k):
+def stability_matrix(k):
+    S_nok, mu_tilde = get_shared_numpy_arrays()
     matrix_size = len(mu_tilde)
             
     # k term
@@ -218,22 +235,25 @@ def single_file(input_filename):
     phi1 = (M1[:,0] - M1[:,2]) - (M1[:,1] - M1[:,2])
     print("phi0:",np.shape(phi0))
 
-    # construct tilde vectors
-    global mu_tilde, S_nok
-    omega_tilde, mu_tilde, n_tilde = construct_tilde_vectors(mumid, dm2, average_energy, number_dist)
+    # get processors ready
+    pool = mp.Pool(nthreads)
 
+    # construct tilde vectors
+    # use copyto to keep mu_tilde pointing at the shared buffer
+    omega_tilde, n_tilde = construct_tilde_vectors(mumid, dm2, average_energy, number_dist)
+
+    # loop over radii
     ir_list = range(ir_start, ir_stop+1)
     eigenvalues = []
     for ir in ir_list:
         start = time.time()
 
         # construct stability matrix
-        S_nok = stability_matrix_nok(mu_tilde, n_tilde[ir], omega_tilde[ir], Ve[ir], phi0[ir], phi1[ir])
+        set_stability_matrix_nok(n_tilde[ir], omega_tilde[ir], Ve[ir], phi0[ir], phi1[ir])
 
         # loop over k points. Temporary stupid k list.
-        eigenvalues_thisr = []
-        for kp in np.ones(2)*k:
-            eigenvalues_thisr.append(eigenvalues_single_k(kp))
+        klist = np.arange(3)*k
+        eigenvalues_thisr = pool.map(eigenvalues_single_k, klist)
         eigenvalues.append(eigenvalues_thisr)
         
         end = time.time()
@@ -241,6 +261,7 @@ def single_file(input_filename):
         print(eigenvalues[-1])
 
     # output data
+    S_nok, mu_tilde = get_shared_numpy_arrays()
     output_filename = input_filename[:-3]+"_eigenvalues.h5"
     print("Writing",output_filename)
     fout = h5py.File(output_filename, "w")
