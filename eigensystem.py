@@ -257,6 +257,7 @@ def single_file(input_filename):
     # loop over radii
     ir_list = range(ir_start, ir_stop+1)
     eigenvalues = []
+    kgrid_list = []
     for ir in ir_list:
         start = time.time()
 
@@ -264,9 +265,10 @@ def single_file(input_filename):
         set_stability_matrix_nok(n_tilde[ir], omega_tilde[ir], Ve[ir], phi0[ir], phi1[ir])
 
         # loop over k points. Temporary stupid k list.
-        klist = build_k_grid(phi0[ir], numb_k, min_ktarget_multiplier, max_ktarget_multiplier)
-        eigenvalues_thisr = pool.map(eigenvalues_single_k, klist)
+        kgrid = build_k_grid(phi0[ir], numb_k, min_ktarget_multiplier, max_ktarget_multiplier)
+        eigenvalues_thisr = pool.map(eigenvalues_single_k, kgrid)
         eigenvalues.append(eigenvalues_thisr)
+        kgrid_list.append(kgrid)
         
         end = time.time()
         print("Time elapsed for ir =",ir,":",end-start, "sec.")
@@ -286,6 +288,7 @@ def single_file(input_filename):
     fout["ir (base 1)"] = [ir+1 for ir in ir_list]
     fout["number_dist (1|ccm)"] = number_dist
     fout["eigenvalues (erg)"] = eigenvalues
+    fout["kgrid (erg)"] = kgrid_list
     fout.close()
 
 single_file(input_filename)
