@@ -26,6 +26,7 @@ import scipy.linalg
 import copy
 import multiprocessing as mp
 import discrete_ordinates
+import minerbo
 
 h = 6.6260755e-27 # erg s
 hbar = h/(2.*np.pi)
@@ -46,7 +47,7 @@ nthreads = 2
 numb_k = 10
 min_ktarget_multiplier = 1e-3
 max_ktarget_multiplier = 1e1
-distribution_interpolator = "DO" # currently does nothing
+distribution_interpolator = "Minerbo" # "DO" or "Minerbo"
 
 # set up global shared memory
 S_nok_RA = mp.RawArray('d',(target_resolution*2)**2)
@@ -87,7 +88,6 @@ def build_k_grid(k_target,numb_k,min_ktarget_multiplier,max_ktarget_multiplier):
 
     #join into single array
     k_grid=np.concatenate((-np.flip(k_grid_pos),[0],k_grid_pos),axis=0)
-    print(k_grid)
     return k_grid
 
 
@@ -132,8 +132,6 @@ def set_stability_matrix_nok(n_tilde,omega_tilde, Ve, phi0, phi1):
             + phi0 \
             - mu_tilde[i]*phi1
 
-    print("after vac/matter:",np.min(S_nok),np.max(S_nok))
-
 #=================================#
 # do the real work for a single k #
 #=================================#
@@ -163,8 +161,13 @@ def single_file(input_filename):
     mugrid, mumid, frequency, dist, rho, Ye = read_data(input_filename)
 
     # refine distribution
-    mugrid, mumid, dist = discrete_ordinates.refine_distribution(mugrid, mumid, dist, target_resolution)
-    
+    if distribution_interpolator == "DO":
+        mugrid, mumid, dist = discrete_ordinates.refine_distribution(mugrid, mumid, dist, target_resolution)
+    elif distribution_interpolator == "Minerbo":
+        mugrid, mumid, dist =            minerbo.refine_distribution(mugrid, mumid, dist, target_resolution)
+    else:
+        print("Error: "+distribution_interpolator+"not found!")
+        
     #=======================#
     # integrate over energy #
     #=======================#
