@@ -164,8 +164,8 @@ def build_k_grid(n_nu,n_nubar,numb_k,min_multiplier,max_multiplier):
     return k_grid
    #SDF: Later, I would like to make this grid truly log spaces about the target, 
    # i.e. log spaced out in both directions away from k_target, as below.
-   #k_upper=np.logspace(ktarget,ktarget*max_multiplier,num=numb_k,endpoint=True,base=np.exp(1))
-   # k_lower=np.logspace(ktarget,ktarget*min_multiplier,num=numb_k,endpoint=True,base=np.exp(1))
+   #k_upper=np.geomspace(ktarget,ktarget*max_multiplier,num=numb_k,endpoint=True,base=np.exp(1))
+   # k_lower=np.geomspace(ktarget,ktarget*min_multiplier,num=numb_k,endpoint=True,base=np.exp(1))
    #k_grid=np.concatenate[(k_grid_lower,k_grid_upper),axis=0]
 
 <<<<<<< HEAD
