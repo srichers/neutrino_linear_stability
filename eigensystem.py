@@ -77,21 +77,16 @@ def read_data(filename):
 
     return mugrid, mumid, frequency, dist, rho, Ye
 
-def build_k_grid(n_nu,n_nubar,numb_k,max_multiplier,min_multiplier):
+def build_k_grid(n_nu,n_nubar,numb_k,min_multiplier,max_multiplier):
     #multipliers set the range away from k_target that the grid should begin/end.
     #Target k is based on the 'total' self-interaction at this radius
     k_target = np.sqrt(2.) * GF * (n_nu-n_nubar)
-    print("k_target=" ,k_target)
-    print("k_max=" ,k_target*max_multiplier)
-    print("k_target=" ,k_target*min_multiplier)
-    #make ln spaced array for positive values of k_target
-    k_grid_pos=np.logspace(min_multiplier*k_target,max_multiplier*k_target,num=numb_k,endpoint=True)
-    print(np.log(k_grid_pos))
+    #make log spaced array for positive values of k_target
+    k_grid_pos=np.geomspace(min_multiplier*k_target,max_multiplier*k_target,num=numb_k,endpoint=True)
     #repeat for negative values of k_target
-    k_grid_neg=np.logspace(-min_multiplier*k_target,-max_multiplier*k_target,num=numb_k,endpoint=True)
+    k_grid_neg=np.geomspace(-min_multiplier*k_target,-max_multiplier*k_target,num=numb_k,endpoint=True)
     #join into single array
     k_grid=np.concatenate((k_grid_pos,k_grid_neg),axis=0)
-    
     return k_grid
    #SDF: Later, I would like to make this grid truly log spaces about the target, 
    # i.e. log spaced out in both directions away from k_target, as below.
