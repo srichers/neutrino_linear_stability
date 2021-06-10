@@ -100,16 +100,13 @@ def construct_tilde_vectors(mumid, dm2, average_energy, number_dist):
 
     omega = np.ones(len(mumid))[np.newaxis,:] * (dm2 / (2.*average_energy))[:,np.newaxis]
     omega_tilde = np.concatenate((-omega, omega), axis=1)
-    print("omega_tilde:",np.shape(omega_tilde))
 
     # set global mu_tilde
     np.copyto(mu_tilde, np.concatenate((mumid, mumid)))
-    print("mu_tilde:",np.shape(mu_tilde))
     
     n_nu    = number_dist[:,0,:] - number_dist[:,2,:]
     n_nubar = number_dist[:,1,:] - number_dist[:,2,:]
     n_tilde = np.concatenate((n_nu, -n_nubar), axis=1)
-    print("n_tilde:",np.shape(n_tilde))
 
     return omega_tilde, n_tilde
 
@@ -174,7 +171,7 @@ def single_file(input_filename):
     neutrino_energy_mid = h * frequency
     number_dist = np.sum(dist / neutrino_energy_mid[np.newaxis,np.newaxis,:,np.newaxis],\
                          axis=(2))
-    print("number_dist:",np.shape(number_dist))
+    print("number_dist shape:",np.shape(number_dist))
     
     #==========================#
     # calculate average energy #
@@ -182,7 +179,6 @@ def single_file(input_filename):
     edens = np.sum(dist,axis=(1,2,3))
     ndens = np.sum(number_dist,axis=(1,2))
     average_energy = edens / ndens
-    print("average_energy:",np.min(average_energy)/MeV, np.max(average_energy)/MeV)
 
     #======================#
     # get vmatter and phis #
@@ -192,7 +188,6 @@ def single_file(input_filename):
     M1 = np.sqrt(2.) * GF * np.sum(number_dist * mumid, axis=2)
     phi0 = (M0[:,0] - M0[:,2]) - (M0[:,1] - M0[:,2])
     phi1 = (M1[:,0] - M1[:,2]) - (M1[:,1] - M1[:,2])
-    print("phi0:",np.shape(phi0))
 
     # get processors ready
     pool = mp.Pool(nthreads)
@@ -221,10 +216,11 @@ def single_file(input_filename):
         print(" ir="+str(ir),
               " time="+"{:.2e}".format(end-start)+"s.",
               " ktarget="+"{:.2e}".format(phi0[ir]),
-              " minReal="+"{:.2e}".format(np.min(np.real(eigenvalues_thisr))),
-              " maxReal="+"{:.2e}".format(np.max(np.real(eigenvalues_thisr))),
-              " minImag="+"{:.2e}".format(np.min(np.imag(eigenvalues_thisr))),
-              " maxImag="+"{:.2e}".format(np.max(np.imag(eigenvalues_thisr))))
+              " Eavg="+"{:.1f}".format(average_energy[ir]/MeV)+"MeV",
+              " minR="+"{:.2e}".format(np.min(np.real(eigenvalues_thisr))),
+              " maxR="+"{:.2e}".format(np.max(np.real(eigenvalues_thisr))),
+              " minI="+"{:.2e}".format(np.min(np.imag(eigenvalues_thisr))),
+              " maxI="+"{:.2e}".format(np.max(np.imag(eigenvalues_thisr))))
 
     # get mu_tilde for output
     S_nok, mu_tilde = get_shared_numpy_arrays()
