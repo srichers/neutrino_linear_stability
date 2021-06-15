@@ -220,6 +220,7 @@ def single_file(input_filename):
     #----------
     # loop over radii
     #----------
+   loopstart = time.time()
     ir_list = range(ir_start, ir_stop+1)
     eigenvalues = []
     kgrid_list = []
@@ -251,6 +252,8 @@ def single_file(input_filename):
               " maxR="+"{:.2e}".format(np.max(np.real(eigenvalues_thisr))),
               " minI="+"{:.2e}".format(np.min(np.imag(eigenvalues_thisr))),
               " maxI="+"{:.2e}".format(np.max(np.imag(eigenvalues_thisr))))
+    loopend=time.time()
+    print("total time ="+loopstart-loopend+" seconds")        
 
     #----------
     # get mu_tilde for output
@@ -263,6 +266,7 @@ def single_file(input_filename):
     output_filename = input_filename[:-3]
     output_filename += "_dm"+"{:.2e}".format(dm2/eV**2)
     output_filename += "_"+distribution_interpolator
+    output_filename += target_resolution
     output_filename += "_eigenvalues.h5"
     print("Writing",output_filename)
 
