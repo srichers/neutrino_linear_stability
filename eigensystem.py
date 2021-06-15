@@ -276,11 +276,11 @@ def single_file(input_filename):
         
         end = time.time()
         print("Time elapsed for ir =",ir,":",end-start, "sec.")
-        print(eigenvalues[-1])
+       print(eigenvalues[-1])
 
     # output data
     S_nok, mu_tilde = get_shared_numpy_arrays()
-    output_filename = input_filename[:-3]+"_eigenvalues.h5"
+    output_filename = input_filename[:-3]+target_resolution+"_eigenvalues.h5"
     print("Writing",output_filename)
     fout = h5py.File(output_filename, "w")
     fout["Ve (erg)"] = Ve
