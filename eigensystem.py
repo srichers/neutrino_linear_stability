@@ -139,7 +139,7 @@ def eigenvalues_single_k(k):
     S = stability_matrix(k)
 
     # find the eigenvalues
-    return scipy.linalg.eigvals(S)
+    return np.linalg.eigvals(S)
 
 #=================================#
 # construct full stability matrix #
@@ -166,7 +166,6 @@ def get_shared_numpy_arrays():
     S_nok = np.frombuffer(S_nok_RA).reshape((target_resolution*2,target_resolution*2))
     mu_tilde = np.frombuffer(mu_tilde_RA)
     return S_nok, mu_tilde
-pool = mp.Pool(nthreads)
 
 #===========================================#
 # do all eigenvalue calculations for a file #
@@ -236,7 +235,9 @@ def single_file(input_filename):
         # loop over k points
         #----------
         kgrid = build_k_grid(phi0[ir], numb_k, min_ktarget_multiplier, max_ktarget_multiplier)
-        eigenvalues_thisr = pool.map(eigenvalues_single_k, kgrid)
+        with mp.Pool(processes=nthreads) as pool:
+            eigenvalues_thisr = pool.map(eigenvalues_single_k, kgrid)
+    
         eigenvalues.append(eigenvalues_thisr)
         kgrid_list.append(kgrid)
         
@@ -287,4 +288,5 @@ def single_file(input_filename):
     fout["kgrid (erg)"] = kgrid_list
     fout.close()
 
-single_file(input_filename)
+if __name__ == '__main__':
+    single_file(input_filename)
