@@ -45,7 +45,8 @@ def refine_distribution(old_mugrid, old_mumid, old_dist, target_resolution):
             new_dist[:,:,:,2*i+1] = old_dist[:,:,:,i]/2.
 
     # new grid structure #
-    new_mumid = np.array([0.5*(new_mugrid[i]+new_mugrid[i+1]) for i in range(new_nmu)])
+    if nref > 0:
+        new_mumid = np.array([0.5*(new_mugrid[i]+new_mugrid[i+1]) for i in range(new_nmu)])
 
     # calculate error in moments #
     new_edens = np.sum(new_dist               , axis=(1,2,3))
