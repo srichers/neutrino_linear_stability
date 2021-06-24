@@ -50,6 +50,11 @@ def refine_distribution(old_mugrid, old_mumid, old_dist, target_resolution):
     new_dist = old_dist
     new_nmu = old_nmu
     
+    # get properties & derivatives of the old distribution function
+    nr = old_dist.shape[0]
+    ns = old_dist.shape[1]
+    ne = old_dist.shape[2]
+
     nref =  int(np.log2(target_resolution / old_nmu))
     for iref in range(nref):
         if(iref>0):
