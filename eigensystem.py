@@ -179,12 +179,9 @@ def single_file(input_filename):
     #----------
     # refine distribution
     #----------
-    if distribution_interpolator == "DO":
-        mugrid, mumid, dist = discrete_ordinates.refine_distribution(mugrid, mumid, dist, target_resolution)
-    elif distribution_interpolator == "Minerbo":
-        mugrid, mumid, dist =            minerbo.refine_distribution(mugrid, mumid, dist, target_resolution)
-    else:
-        print("Error: "+distribution_interpolator+"not found!")
+    mugrid, mumid, dist = discrete_ordinates.refine_distribution(mugrid, mumid, dist, target_resolution)
+    if distribution_interpolator == "Minerbo":
+        dist = minerbo.redistribute_distribution(mugrid, mumid, dist, target_resolution)
         
     #----------
     # integrate over energy

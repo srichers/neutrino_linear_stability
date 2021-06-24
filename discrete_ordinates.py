@@ -51,9 +51,9 @@ def refine_distribution(old_mugrid, old_mumid, old_dist, target_resolution):
     new_edens = np.sum(new_dist               , axis=(1,2,3))
     new_flux  = np.sum(new_dist * new_mumid   , axis=(1,2,3))
     new_press = np.sum(new_dist * new_mumid**2, axis=(1,2,3))
-    print("Max relative error in net energy density:", np.max(np.abs((new_edens-old_edens)/old_edens)))
-    print("Max relative error in net flux:", np.max(np.abs((new_flux-old_flux)/old_edens)))
-    print("Max relative error in net pressure:", np.max(np.abs((new_press-old_press)/old_edens)))
+    print("  DO Max relative error in net energy density:", np.max(np.abs((new_edens-old_edens)/old_edens)))
+    print("  DO Max relative error in net flux:", np.max(np.abs((new_flux-old_flux)/old_edens)))
+    print("  DO Max relative error in net pressure:", np.max(np.abs((new_press-old_press)/old_edens)))
 
     return new_mugrid, new_mumid, new_dist
 
