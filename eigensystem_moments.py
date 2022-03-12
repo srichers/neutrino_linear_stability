@@ -34,8 +34,7 @@ import glob
 import scipy.linalg
 import copy
 import multiprocessing as mp
-import discrete_ordinates
-import minerbo
+np.set_printoptions(linewidth=200)
 
 #===========#
 # constants #
@@ -54,29 +53,43 @@ Mp = 1.6726219e-24 # g
 #========#
 dm2 = 2.4e-3 * eV**2 # erg
 nthreads = 2
-numb_k = 100
+numb_k = 10
 nphi_at_equator = 16
 min_ktarget_multiplier = 1e-3
 max_ktarget_multiplier = 1e1
 
 # number density [nu/nubar, flavor] (1/ccm)
-Nee = 1.421954234999705e+33
+#Nee    = 1
+#Neebar = 2./3.
+#Nxx    = 0
+#Nxxbar = 0
+Nee    = 1.421954234999705e+33
 Neebar = 1.9146237131657563e+33
-Nxx = 1.9645407875568215e+33
+Nxx    = 1.9645407875568215e+33
 Nxxbar = Nxx
 N = np.array([[Nee   , Nxx   ],
               [Neebar, Nxxbar]])
+print("\nN:")
+print(N)
 
 # number flux density [nu/nubar, flavor, i] (1/ccm)
+#Fee    = np.array([0,0,  0   ])
+#Feebar = np.array([0,0, -1./3])
+#Fxx    = np.array([0,0,  0   ])
+#Fxxbar = np.array([0,0,  0   ])
 Fee    = np.array([0.0974572,    0.04217632, -0.13433261]) * Nee
 Feebar = np.array([ 0.07237959,  0.03132354, -0.3446878 ]) * Neebar
 Fxx    = np.array([-0.02165833,  0.07431613, -0.53545951]) * Nxx
 Fxxbar = Fxx
 F = np.array([[Fee   , Fxx   ],
               [Feebar, Fxxbar]])
+print("\nF:")
+print(F)
+
 # closure
 def get_Pij(N, F):
     F2 = np.sum(F**2)
+    
     fluxfac = np.sqrt(F2)/N
     chi = 1./3. + 2./15. * fluxfac**2 * (3. - fluxfac + 3.*fluxfac**2)
     
@@ -88,11 +101,18 @@ def get_Pij(N, F):
         F[i]*F[j]/F2 * N 
         for j in range(3)] for i in range(3)])
 
-    return (3.*chi-1.)/2. * Pthin + 3.*(1.-chi)/2. * Pthick
+    P = (3.*chi-1.)/2.*Pthin + 3.*(1.-chi)/2.*Pthick
+
+    if F2==0:
+        return Pthick
+    else:
+        return P
 
 # number pressure [nu/nubar, flavor, i, j]
 P = np.array([[ get_Pij(Nee,   Fee   ), get_Pij(Nxx   , Fxx   )],
               [ get_Pij(Neebar,Feebar), get_Pij(Nxxbar, Fxxbar)]])
+print("\nP:")
+print(P)
 
 # other inputs
 rho = 0 # g/ccm
@@ -102,12 +122,25 @@ average_energy = 50*MeV # erg
 #----------
 # get vmatter and phis (all in ergs)
 #----------
-mu_N = np.sqrt(2.) * (N[:,0]     - N[:,1]    ) # [nu/nubar]
-mu_F = np.sqrt(2.) * (F[:,0,:]   - F[:,1,:]  ) # [nu/nubar, i]
-mu_P = np.sqrt(2.) * (P[:,0,:,:] - P[:,0,:,:]) # [nu/nubar, i, j]
+mu_N = np.sqrt(2.) * GF * (N[:,0]     - N[:,1]    ) # [nu/nubar]
+mu_F = np.sqrt(2.) * GF * (F[:,0,:]   - F[:,1,:]  ) # [nu/nubar, i]
+mu_P = np.sqrt(2.) * GF * (P[:,0,:,:] - P[:,1,:,:]) # [nu/nubar, i, j]
 Ve   = np.sqrt(2.) * GF * (rho * Ye / Mp)
 phi0 = mu_N[0] - mu_N[1]
 phi1 = mu_F[0] - mu_F[1] # [i]
+phi1mag = np.sqrt(np.sum(phi1**2))
+
+print("\nphi0:")
+print(phi0)
+print("\nphi1:")
+print(phi1)
+print("\nmu_N:")
+print(mu_N)
+print("\nmu_F:")
+print(mu_F)
+print("\nmu_P:")
+print(mu_P)
+
 
 # mu parts of the stability matrix [nu/nubar, i, j] where 0 is N and 1-3 are F
 mu = np.zeros((2,4,4))
@@ -115,6 +148,8 @@ mu[:, 0  , 0  ] =  mu_N
 mu[:, 0  , 1:4] =  mu_F
 mu[:, 1:4, 0  ] = -mu_F
 mu[:, 1:4, 1:4] = -mu_P
+print("\nmu:")
+print(mu)
 
 # Stability matrix without k term
 S_nok = np.zeros((8,8))
@@ -122,9 +157,12 @@ S_nok[0:4, 0:4] =  mu[0]
 S_nok[0:4, 4:8] = -mu[0]
 S_nok[4:8, 0:4] =  mu[1]
 S_nok[4:8, 4:8] = -mu[1]
+print("\nS_nok:")
+print(S_nok)
 
 # build the k grid
-kmag_grid = phi0 * np.geomspace(min_ktarget_multiplier,max_ktarget_multiplier,num=numb_k,endpoint=True)
+kmag_grid = phi1mag * np.geomspace(min_ktarget_multiplier,max_ktarget_multiplier,num=numb_k,endpoint=True)
+print()
 print("Using",len(kmag_grid),"kmag points")
 
 # build uniform covering of unit sphere
@@ -152,7 +190,9 @@ ndir = np.shape(direction_grid)[0]
 print("Using",ndir,"k directions")
 
 # construct full k grid
-kgrid = np.array([kmag*direction for direction in direction_grid for kmag in kmag_grid])
+kgrid = [kmag*direction for direction in direction_grid for kmag in kmag_grid]
+kgrid.append([0,0,0])
+kgrid = np.array(kgrid)
 
 #=============================#
 # set up global shared memory #
