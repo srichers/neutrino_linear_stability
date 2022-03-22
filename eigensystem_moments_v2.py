@@ -53,20 +53,65 @@ Mp = 1.6726219e-24 # g
 #========#
 dm2 = 2.4e-3 * eV**2 # erg
 nthreads = 2
-numb_k = 100
-nphi_at_equator = 1
-min_ktarget_multiplier = 1e-3
-max_ktarget_multiplier = 1e1
+
+
+# Fiducial case
+#numb_k = 1000
+#nphi_at_equator = 16
+#min_ktarget_multiplier = 1e-1
+#max_ktarget_multiplier = 1e1
+#Nee    = 4.89e32
+#Neebar = 4.89e32
+#Nxx    = 0
+#Nxxbar = 0
+#Fee    = np.array([0,0,  1./3]) * Nee
+#Feebar = np.array([0,0, -1./3]) * Neebar
+#Fxx    = np.array([0,0,  0   ])
+#Fxxbar = np.array([0,0,  0   ])
+
+# 90Degree case
+#numb_k = 200
+#nphi_at_equator = 64
+#min_ktarget_multiplier = 1
+#max_ktarget_multiplier = 3
+#Nee    = 4.89e32
+#Neebar = 4.89e32
+#Nxx    = 0
+#Nxxbar = 0
+#Fee    = np.array([0, 0   , 1./3]) * Nee
+#Feebar = np.array([0, 1/3., 0   ]) * Neebar
+#Fxx    = np.array([0, 0   , 0   ])
+#Fxxbar = np.array([0, 0   , 0   ])
+
+# TwoThirds case
+#numb_k = 200
+#nphi_at_equator = 64
+#min_ktarget_multiplier = 0.1
+#max_ktarget_multiplier = 3
+#Nee    = 4.89e32
+#Neebar = 4.89e32 * 2./3.
+#Nxx    = 0
+#Nxxbar = 0
+#Fee    = np.array([0,0,  0   ]) * Nee
+#Feebar = np.array([0,0, -1./3]) * Neebar
+#Fxx    = np.array([0,0,  0   ])
+#Fxxbar = np.array([0,0,  0   ])
+
+# NSM case
+numb_k = 200
+nphi_at_equator = 64
+min_ktarget_multiplier = 0.01
+max_ktarget_multiplier = 5
+Nee    = 1.421954234999705e+33
+Neebar = 1.9146237131657563e+33
+Nxx    = 1.9645407875568215e+33
+Nxxbar = Nxx
+Fee    = np.array([0.0974572,    0.04217632, -0.13433261]) * Nee
+Feebar = np.array([ 0.07237959,  0.03132354, -0.3446878 ]) * Neebar
+Fxx    = np.array([-0.02165833,  0.07431613, -0.53545951]) * Nxx
+Fxxbar = Fxx
 
 # number density [nu/nubar, flavor] (1/ccm)
-Nee    = 4.89e32
-Neebar = 4.89e32
-Nxx    = 0
-Nxxbar = 0
-#Nee    = 1.421954234999705e+33
-#Neebar = 1.9146237131657563e+33
-#Nxx    = 1.9645407875568215e+33
-#Nxxbar = Nxx
 N = np.array([[Nee   , Nxx   ],
               [Neebar, Nxxbar]])
 print("\nN:")
@@ -74,14 +119,6 @@ print(N)
 TrN = np.sum(N, axis=1)
 
 # number flux density [nu/nubar, flavor, i] (1/ccm)
-Fee    = np.array([0,0,  1./3]) * Nee
-Feebar = np.array([0,0, -1./3]) * Neebar
-Fxx    = np.array([0,0,  0   ])
-Fxxbar = np.array([0,0,  0   ])
-#Fee    = np.array([0.0974572,    0.04217632, -0.13433261]) * Nee
-#Feebar = np.array([ 0.07237959,  0.03132354, -0.3446878 ]) * Neebar
-#Fxx    = np.array([-0.02165833,  0.07431613, -0.53545951]) * Nxx
-#Fxxbar = Fxx
 F = np.array([[Fee   , Fxx   ],
               [Feebar, Fxxbar]])
 print("\nF:")
@@ -177,9 +214,12 @@ print("\nS_nok:")
 print(S_nok)
 
 # build the k grid
-kmag_grid = phi1mag * np.geomspace(min_ktarget_multiplier,max_ktarget_multiplier,num=numb_k,endpoint=True)
+#kmag_grid = phi1mag * np.geomspace(min_ktarget_multiplier,max_ktarget_multiplier,num=numb_k,endpoint=True)
+dk = phi1mag * (max_ktarget_multiplier - min_ktarget_multiplier)/numb_k / (hbar*c)
+kmag_grid = phi1mag * np.arange(min_ktarget_multiplier, max_ktarget_multiplier, dk)
 print()
 print("Using",len(kmag_grid),"kmag points between",kmag_grid[0]/(hbar*c),"and",kmag_grid[-1]/(hbar*c),"cm^-1")
+print("dk =",dk,"cm^-1")
 
 # build uniform covering of unit sphere
 dtheta = np.pi * np.sqrt(3) / nphi_at_equator
@@ -270,6 +310,7 @@ def compute_all_eigenvalues():
     kmax = kgrid[imax]
     print("kmax = ",kmax/(hbar*c),"cm^-1")
     print("|kmax| = ", np.linalg.norm(kmax)/(hbar*c),"cm^-1")
+    print("1/lambda =", np.linalg.norm(kmax)/(hbar*c)/(2.*np.pi),"cm^-1")
     print()
 
     #----------
