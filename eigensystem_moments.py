@@ -114,7 +114,9 @@ Feebar = np.array([ 0.07237959,  0.03132354, -0.3446878 ]) * Neebar
 Fxx    = np.array([-0.02165833,  0.07431613, -0.53545951]) * Nxx
 Fxxbar = Fxx
 
-# Construct N and F arrays
+#==========================#
+# Construct N and F arrays #
+#==========================#
 N = np.array([[Nee   , Nxx   ],
               [Neebar, Nxxbar]]) # [nu/nubar, flavor]
 N_FT = np.sum(N, axis=1)         # [nu/nubar]
@@ -127,7 +129,9 @@ F_FT = np.sum(F, axis=1)         # [nu/nubar, i]
 print("\nF:")
 print(F)
 
-# flux factors and flux unit vectors
+#====================================#
+# flux factors and flux unit vectors #
+#====================================#
 Fmag    = np.sqrt(np.sum(F**2   , axis=2)) # [nu/nubar, flavor]
 Fmag_FT = np.sqrt(np.sum(F_FT**2, axis=1)) # [nu/nubar]
 
@@ -141,7 +145,9 @@ Fhat_FT = F_FT / Fmag_FT[:,np.newaxis] # [nu/nubar, i]
 Fhat[np.where(Fhat!=Fhat)] = 0
 Fhat_FT[np.where(Fhat_FT!=Fhat_FT)] = 0
 
-# interpolation parameter
+#=========================#
+# interpolation parameter #
+#=========================#
 def get_chi(ff):
     return 1./3. + 2./15. * ff**2 * (3. - ff + 3.*ff**2)
 chi_FT = get_chi(fluxfac_FT)   # [nu/nubar]
@@ -150,24 +156,32 @@ if flavor_trace_chi:
 else:
     chi = get_chi(fluxfac) # [nu/nubar, flavor]
 
-# thick part of pressure tensor
+#===============================#
+# thick part of pressure tensor #
+#===============================#
 Ptilde_thick_FT = np.identity(3)[np.newaxis,:,:] / 3. # [nu/nubar, i, j]
 Ptilde_thick = Ptilde_thick_FT[:,np.newaxis,:,:]      # [nu/nubar, flavor, i, j]
 
-# thin part of pressure tensor 
+#==============================#
+# thin part of pressure tensor #
+#==============================#
 Ptilde_thin_FT = Fhat_FT[:,:,np.newaxis] * Fhat_FT[:,np.newaxis,:] # [nu/nubar, i, j]
 if flavor_trace_fhat:
     Ptilde_thin = Ptilde_thin_FT[:,np.newaxis,:,:]
 else:    
     Ptilde_thin = Fhat[:,:,:,np.newaxis] * Fhat[:,:,np.newaxis,:]  # [nu/nubar, flavor, i, j]
 
-# interpolate between thick and thin 
+#====================================#
+# interpolate between thick and thin #
+#====================================#
 def get_Ptilde(Ptilde_thick, Ptilde_thin, chi):
     return (3.*chi-1.)/2.*Ptilde_thin + 3.*(1.-chi)/2.*Ptilde_thick
 Ptilde_FT = get_Ptilde(Ptilde_thick_FT, Ptilde_thin_FT, chi_FT[:,np.newaxis,np.newaxis]) # [nu/nubar, i, j]
 Ptilde    = get_Ptilde(Ptilde_thick   , Ptilde_thin   , chi[:,:,np.newaxis,np.newaxis] ) # [nu/nubar, flavor, i, j]
 
-# construct actual pressure tensor 
+#==================================#
+# construct actual pressure tensor #
+#==================================#
 P_FT = Ptilde_FT * N_FT[:,np.newaxis,np.newaxis] # [nu/nubar, i, j]
 P    = Ptilde    * N[:,:,np.newaxis,np.newaxis] # [nu/nubar, flavor, i, j]
 print("\nP:")
@@ -176,7 +190,9 @@ print(np.shape(P))
 print(np.shape(P_FT))
 
 
-# Set Cij to the flavor-traced Ptilde
+#=====================================#
+# Set Cij to the flavor-traced Ptilde #
+#=====================================#
 C = Ptilde_FT # [nu/nubar, i, j]
 print("C=")
 print(C)
