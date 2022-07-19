@@ -51,73 +51,98 @@ Mp = 1.6726219e-24 # g
 #========#
 # inputs #
 #========#
+flavor_trace_chi = True  # in calculation of P. Always true in Cij
+flavor_trace_fhat = True # in calculation of P. Always true in Cij
 dm2 = 2.4e-3 * eV**2 # erg
 nthreads = 2
-numb_k = 10
-nphi_at_equator = 16
-min_ktarget_multiplier = 1e-3
-max_ktarget_multiplier = 1e1
-
-# number density [nu/nubar, flavor] (1/ccm)
-#Nee    = 1
-#Neebar = 2./3.
-#Nxx    = 0
-#Nxxbar = 0
-Nee    = 1.421954234999705e+33
-Neebar = 1.9146237131657563e+33
-Nxx    = 1.9645407875568215e+33
-Nxxbar = Nxx
-N = np.array([[Nee   , Nxx   ],
-              [Neebar, Nxxbar]])
-print("\nN:")
-print(N)
-
-# number flux density [nu/nubar, flavor, i] (1/ccm)
-#Fee    = np.array([0,0,  0   ])
-#Feebar = np.array([0,0, -1./3])
-#Fxx    = np.array([0,0,  0   ])
-#Fxxbar = np.array([0,0,  0   ])
-Fee    = np.array([0.0974572,    0.04217632, -0.13433261]) * Nee
-Feebar = np.array([ 0.07237959,  0.03132354, -0.3446878 ]) * Neebar
-Fxx    = np.array([-0.02165833,  0.07431613, -0.53545951]) * Nxx
-Fxxbar = Fxx
-F = np.array([[Fee   , Fxx   ],
-              [Feebar, Fxxbar]])
-print("\nF:")
-print(F)
-
-# closure
-def get_Pij(N, F):
-    F2 = np.sum(F**2)
-    
-    fluxfac = np.sqrt(F2)/N
-    chi = 1./3. + 2./15. * fluxfac**2 * (3. - fluxfac + 3.*fluxfac**2)
-    
-    # thick pressure tensor
-    Pthick = np.identity(3) * N/3.
-
-    # thin pressure tensor
-    Pthin = np.array([[
-        F[i]*F[j]/F2 * N 
-        for j in range(3)] for i in range(3)])
-
-    P = (3.*chi-1.)/2.*Pthin + 3.*(1.-chi)/2.*Pthick
-
-    if F2==0:
-        return Pthick
-    else:
-        return P
-
-# number pressure [nu/nubar, flavor, i, j]
-P = np.array([[ get_Pij(Nee,   Fee   ), get_Pij(Nxx   , Fxx   )],
-              [ get_Pij(Neebar,Feebar), get_Pij(Nxxbar, Fxxbar)]])
-print("\nP:")
-print(P)
-
-# other inputs
 rho = 0 # g/ccm
 Ye = 0.5
 average_energy = 50*MeV # erg
+
+numb_k = 10
+nphi_at_equator = 16
+min_ktarget_multiplier = 1e-1
+max_ktarget_multiplier = 1e1
+Nee    = 4.89e32
+Neebar = 4.89e32
+Nxx    = 0
+Nxxbar = 0
+Fee    = np.array([0,0,  1./3]) * Nee
+Feebar = np.array([0,0, -1./3]) * Neebar
+Fxx    = np.array([0,0,  0   ])
+Fxxbar = np.array([0,0,  0   ])
+
+#Nee    = 1.421954234999705e+33
+#Neebar = 1.9146237131657563e+33
+#Nxx    = 1.9645407875568215e+33
+#Nxxbar = Nxx
+#Fee    = np.array([0.0974572,    0.04217632, -0.13433261]) * Nee
+#Feebar = np.array([ 0.07237959,  0.03132354, -0.3446878 ]) * Neebar
+#Fxx    = np.array([-0.02165833,  0.07431613, -0.53545951]) * Nxx
+#Fxxbar = Fxx
+
+# Construct N and F arrays
+N = np.array([[Nee   , Nxx   ],
+              [Neebar, Nxxbar]]) # [nu/nubar, flavor]
+N_FT = np.sum(N, axis=1)         # [nu/nubar]
+print("\nN:")
+print(N)
+
+F = np.array([[Fee   , Fxx   ],
+              [Feebar, Fxxbar]]) # [nu/nubar, flavor, i]
+F_FT = np.sum(F, axis=1)         # [nu/nubar, i]
+print("\nF:")
+print(F)
+
+# flux factors and flux unit vectors
+Fmag    = np.sqrt(np.sum(F**2   , axis=2)) # [nu/nubar, flavor]
+Fmag_FT = np.sqrt(np.sum(F_FT**2, axis=1)) # [nu/nubar]
+
+fluxfac    = Fmag    / N    # [nu/nubar, flavor]
+fluxfac_FT = Fmag_FT / N_FT # [nu/nubar]
+
+Fhat    = F    / Fmag[:,:,np.newaxis]  # [nu/nubar, flavor, i]
+Fhat_FT = F_FT / Fmag_FT[:,np.newaxis] # [nu/nubar, i]
+
+# interpolation parameter
+def get_chi(ff):
+    return 1./3. + 2./15. * ff**2 * (3. - ff + 3.*ff**2)
+chi_FT = get_chi(fluxfac_FT)   # [nu/nubar]
+if flavor_trace_chi:
+    chi = chi_FT[:,np.newaxis]
+else:
+    chi = get_chi(fluxfac) # [nu/nubar, flavor]
+
+# thick part of pressure tensor
+Ptilde_thick_FT = np.identity(3)[np.newaxis,:,:] / 3. # [nu/nubar, i, j]
+Ptilde_thick = Ptilde_thick_FT[:,np.newaxis,:,:]      # [nu/nubar, flavor, i, j]
+
+# thin part of pressure tensor 
+Ptilde_thin_FT = Fhat_FT[:,:,np.newaxis] * Fhat_FT[:,np.newaxis,:] # [nu/nubar, i, j]
+if flavor_trace_fhat:
+    Ptilde_thin = Ptilde_thin_FT[:,np.newaxis,:,:]
+else:    
+    Ptilde_thin = Fhat[:,:,:,np.newaxis] * Fhat[:,:,np.newaxis,:]  # [nu/nubar, flavor, i, j]
+
+# interpolate between thick and thin 
+def get_Ptilde(Ptilde_thick, Ptilde_thin, chi):
+    return (3.*chi-1.)/2.*Ptilde_thin + 3.*(1.-chi)/2.*Ptilde_thick
+Ptilde_FT = get_Ptilde(Ptilde_thick_FT, Ptilde_thin_FT, chi_FT[:,np.newaxis,np.newaxis]) # [nu/nubar, i, j]
+Ptilde    = get_Ptilde(Ptilde_thick   , Ptilde_thin   , chi[:,:,np.newaxis,np.newaxis] ) # [nu/nubar, flavor, i, j]
+
+# construct actual pressure tensor 
+P_FT = Ptilde_FT * N_FT[:,np.newaxis,np.newaxis] # [nu/nubar, i, j]
+P    = Ptilde    * N[:,:,np.newaxis,np.newaxis] # [nu/nubar, flavor, i, j]
+print("\nP:")
+print(P)
+print(np.shape(P))
+print(np.shape(P_FT))
+
+
+# Set Cij to the flavor-traced Ptilde
+C = Ptilde_FT # [nu/nubar, i, j]
+print("C=")
+print(C)
 
 #----------
 # get vmatter and phis (all in ergs)
@@ -145,14 +170,16 @@ print(mu_P)
 # mu parts of the stability matrix [nu/nubar, i, j] where 0 is N and 1-3 are F
 mu = np.zeros((2,4,4))
 mu[:, 0  , 0  ] =  mu_N
-mu[:, 0  , 1:4] =  mu_F
-mu[:, 1:4, 0  ] = -mu_F
+mu[:, 0  , 1:4] = -mu_F
+mu[:, 1:4, 0  ] =  mu_F
 mu[:, 1:4, 1:4] = -mu_P
 print("\nmu:")
 print(mu)
 
 # Stability matrix without k term
-S_nok = np.zeros((8,8))
+S_nok_RA = mp.RawArray('d',8*8)
+S_nok = np.frombuffer(S_nok_RA).reshape((8,8))
+#S_nok = np.zeros((8,8))
 S_nok[0:4, 0:4] =  mu[0]
 S_nok[0:4, 4:8] = -mu[0]
 S_nok[4:8, 0:4] =  mu[1]
@@ -161,9 +188,13 @@ print("\nS_nok:")
 print(S_nok)
 
 # build the k grid
-kmag_grid = phi1mag * np.geomspace(min_ktarget_multiplier,max_ktarget_multiplier,num=numb_k,endpoint=True)
+dk = phi1mag * (max_ktarget_multiplier - min_ktarget_multiplier)/numb_k / (hbar*c)
+kmag_grid = phi1mag * np.arange(min_ktarget_multiplier, max_ktarget_multiplier, dk)
+#kmag_grid = phi1mag * np.geomspace(min_ktarget_multiplier,max_ktarget_multiplier,num=numb_k,endpoint=True)
 print()
-print("Using",len(kmag_grid),"kmag points")
+print("Using",len(kmag_grid),"kmag points between",kmag_grid[0]/(hbar*c),"and",kmag_grid[-1]/(hbar*c),"cm^-1")
+print("dk =",dk,"cm^-1")
+
 
 # build uniform covering of unit sphere
 dtheta = np.pi * np.sqrt(3) / nphi_at_equator
@@ -194,24 +225,19 @@ kgrid = [kmag*direction for direction in direction_grid for kmag in kmag_grid]
 kgrid.append([0,0,0])
 kgrid = np.array(kgrid)
 
-#=============================#
-# set up global shared memory #
-#=============================#
-S_nok_RA = mp.RawArray('d',8*8)
-S_nok = np.frombuffer(S_nok_RA).reshape((8,8))
-
 #=================================#
 # do the real work for a single k #
 #=================================#
 # k:erg output:erg
 def eigenvalues_single_k(k):
     # complete the stability matrix
+    kp = k - (mu_F[0] - mu_F[1])
     S_nok = np.frombuffer(S_nok_RA).reshape((8,8))
     S = copy.deepcopy(S_nok)
-    S[0  , 1:4] -= k
-    S[1:4, 0  ] -= k # should contain C
-    S[4  , 5:8] -= k
-    S[5:8, 4  ] -= k # should contain C
+    S[0  , 1:4] -= kp
+    S[4  , 5:8] -= kp
+    S[1:4, 0  ] -= np.tensordot(kp, C[0], axes=1)
+    S[5:8, 4  ] -= np.tensordot(kp, C[1], axes=1)
 
     # find the eigenvalues
     return np.linalg.eigvals(S)
@@ -250,7 +276,14 @@ def compute_all_eigenvalues():
     print("|R| within [",np.min(Rabs),np.max(Rabs),"]")
     print("|I| within [",np.min(Iabs),np.max(Iabs),"]")
     print()
-
+    Imax = np.max(I, axis=1)
+    imax = np.argmax(Imax)
+    kmax = kgrid[imax]
+    print("kmax = ",kmax/(hbar*c),"cm^-1")
+    print("|kmax| = ", np.linalg.norm(kmax)/(hbar*c),"cm^-1")
+    print("1/lambda =", np.linalg.norm(kmax)/(hbar*c)/(2.*np.pi),"cm^-1")
+    print()   
+    
     #----------
     # set output filename
     #----------
