@@ -59,27 +59,60 @@ rho = 0 # g/ccm
 Ye = 0.5
 average_energy = 50*MeV # erg
 
-numb_k = 10
-nphi_at_equator = 16
-min_ktarget_multiplier = 1e-1
-max_ktarget_multiplier = 1e1
-Nee    = 4.89e32
-Neebar = 4.89e32
-Nxx    = 0
-Nxxbar = 0
-Fee    = np.array([0,0,  1./3]) * Nee
-Feebar = np.array([0,0, -1./3]) * Neebar
-Fxx    = np.array([0,0,  0   ])
-Fxxbar = np.array([0,0,  0   ])
+#numb_k = 10
+#nphi_at_equator = 16
+#min_ktarget_multiplier = 1e-1
+#max_ktarget_multiplier = 1e1
+#Nee    = 4.89e32
+#Neebar = 4.89e32
+#Nxx    = 0
+#Nxxbar = 0
+#Fee    = np.array([0,0,  1./3]) * Nee
+#Feebar = np.array([0,0, -1./3]) * Neebar
+#Fxx    = np.array([0,0,  0   ])
+#Fxxbar = np.array([0,0,  0   ])
 
-#Nee    = 1.421954234999705e+33
-#Neebar = 1.9146237131657563e+33
-#Nxx    = 1.9645407875568215e+33
-#Nxxbar = Nxx
-#Fee    = np.array([0.0974572,    0.04217632, -0.13433261]) * Nee
-#Feebar = np.array([ 0.07237959,  0.03132354, -0.3446878 ]) * Neebar
-#Fxx    = np.array([-0.02165833,  0.07431613, -0.53545951]) * Nxx
-#Fxxbar = Fxx
+# 90Degree case
+#numb_k = 200
+#nphi_at_equator = 64
+#min_ktarget_multiplier = 1
+#max_ktarget_multiplier = 3
+#Nee    = 4.89e32
+#Neebar = 4.89e32
+#Nxx    = 0
+#Nxxbar = 0
+#Fee    = np.array([0, 0   , 1./3]) * Nee
+#Feebar = np.array([0, 1/3., 0   ]) * Neebar
+#Fxx    = np.array([0, 0   , 0   ])
+#Fxxbar = np.array([0, 0   , 0   ])
+
+# TwoThirds case
+#numb_k = 200
+#nphi_at_equator = 64
+#min_ktarget_multiplier = 0.1
+#max_ktarget_multiplier = 3
+#Nee    = 4.89e32
+#Neebar = 4.89e32 * 2./3.
+#Nxx    = 0
+#Nxxbar = 0
+#Fee    = np.array([0,0,  0   ]) * Nee
+#Feebar = np.array([0,0, -1./3]) * Neebar
+#Fxx    = np.array([0,0,  0   ])
+#Fxxbar = np.array([0,0,  0   ])
+
+# NSM case
+numb_k = 20
+nphi_at_equator = 16
+min_ktarget_multiplier = 0.01
+max_ktarget_multiplier = 5
+Nee    = 1.421954234999705e+33
+Neebar = 1.9146237131657563e+33
+Nxx    = 1.9645407875568215e+33
+Nxxbar = Nxx
+Fee    = np.array([0.0974572,    0.04217632, -0.13433261]) * Nee
+Feebar = np.array([ 0.07237959,  0.03132354, -0.3446878 ]) * Neebar
+Fxx    = np.array([-0.02165833,  0.07431613, -0.53545951]) * Nxx
+Fxxbar = Fxx
 
 # Construct N and F arrays
 N = np.array([[Nee   , Nxx   ],
@@ -100,9 +133,13 @@ Fmag_FT = np.sqrt(np.sum(F_FT**2, axis=1)) # [nu/nubar]
 
 fluxfac    = Fmag    / N    # [nu/nubar, flavor]
 fluxfac_FT = Fmag_FT / N_FT # [nu/nubar]
+fluxfac[np.where(N==0)] = 0
+fluxfac_FT[np.where(N_FT==0)] = 0
 
 Fhat    = F    / Fmag[:,:,np.newaxis]  # [nu/nubar, flavor, i]
 Fhat_FT = F_FT / Fmag_FT[:,np.newaxis] # [nu/nubar, i]
+Fhat[np.where(Fhat!=Fhat)] = 0
+Fhat_FT[np.where(Fhat_FT!=Fhat_FT)] = 0
 
 # interpolation parameter
 def get_chi(ff):
@@ -187,13 +224,13 @@ S_nok[4:8, 4:8] = -mu[1]
 print("\nS_nok:")
 print(S_nok)
 
-# build the k grid
-dk = phi1mag * (max_ktarget_multiplier - min_ktarget_multiplier)/numb_k / (hbar*c)
-kmag_grid = phi1mag * np.arange(min_ktarget_multiplier, max_ktarget_multiplier, dk)
-#kmag_grid = phi1mag * np.geomspace(min_ktarget_multiplier,max_ktarget_multiplier,num=numb_k,endpoint=True)
+# build the kprime grid
+dkprime = phi1mag * (max_ktarget_multiplier - min_ktarget_multiplier)/numb_k / (hbar*c)
+kprime_mag_grid = phi1mag * np.arange(min_ktarget_multiplier, max_ktarget_multiplier, dkprime)
+#kprime_mag_grid = phi1mag * np.geomspace(min_ktarget_multiplier,max_ktarget_multiplier,num=numb_k,endpoint=True)
 print()
-print("Using",len(kmag_grid),"kmag points between",kmag_grid[0]/(hbar*c),"and",kmag_grid[-1]/(hbar*c),"cm^-1")
-print("dk =",dk,"cm^-1")
+print("Using",len(kprime_mag_grid),"kprime_mag points between",kprime_mag_grid[0]/(hbar*c),"and",kprime_mag_grid[-1]/(hbar*c),"cm^-1")
+print("dkprime =",dkprime,"cm^-1") # 
 
 
 # build uniform covering of unit sphere
@@ -220,24 +257,23 @@ direction_grid = np.array(direction_grid)
 ndir = np.shape(direction_grid)[0]
 print("Using",ndir,"k directions")
 
-# construct full k grid
-kgrid = [kmag*direction for direction in direction_grid for kmag in kmag_grid]
-kgrid.append([0,0,0])
-kgrid = np.array(kgrid)
+# construct full kprime grid
+kprime_grid = [kprime_mag*direction for direction in direction_grid for kprime_mag in kprime_mag_grid]
+kprime_grid.append([0,0,0])
+kprime_grid = np.array(kprime_grid)
 
 #=================================#
 # do the real work for a single k #
 #=================================#
 # k:erg output:erg
-def eigenvalues_single_k(k):
+def eigenvalues_single_k(kprime):
     # complete the stability matrix
-    kp = k - (mu_F[0] - mu_F[1])
     S_nok = np.frombuffer(S_nok_RA).reshape((8,8))
     S = copy.deepcopy(S_nok)
-    S[0  , 1:4] -= kp
-    S[4  , 5:8] -= kp
-    S[1:4, 0  ] -= np.tensordot(kp, C[0], axes=1)
-    S[5:8, 4  ] -= np.tensordot(kp, C[1], axes=1)
+    S[0  , 1:4] -= kprime
+    S[4  , 5:8] -= kprime
+    S[1:4, 0  ] -= np.tensordot(kprime, C[0], axes=1)
+    S[5:8, 4  ] -= np.tensordot(kprime, C[1], axes=1)
 
     # find the eigenvalues
     return np.linalg.eigvals(S)
@@ -256,10 +292,10 @@ def compute_all_eigenvalues():
     # loop over k points
     #----------
     start_time = time.time()
-    #for k in kgrid:
-    #    eigenvalues.append(eigenvalues_single_k(k))
+    #for kprime in kprime_grid:
+    #    eigenvalues.append(eigenvalues_single_k(kprime))
     with mp.Pool(processes=nthreads) as pool:
-        eigenvalues = pool.map(eigenvalues_single_k, kgrid)
+        eigenvalues = pool.map(eigenvalues_single_k, kprime_grid)
     end_time = time.time()
     
     #----------
@@ -269,19 +305,19 @@ def compute_all_eigenvalues():
     R = np.real(eigenvalues)
     I = np.imag(eigenvalues)
     print("time="+"{:.2e}".format(end_time-start_time)+"s.")
-    print("R within [",np.min(R),np.max(R),"]")
-    print("I within [",np.min(I),np.max(I),"]")
+    print("Re(Omega_prime) within [",np.min(R),np.max(R),"]")
+    print("Im(Omega_prime) within [",np.min(I),np.max(I),"]")
     Rabs = np.abs(R)
     Iabs = np.abs(I)
-    print("|R| within [",np.min(Rabs),np.max(Rabs),"]")
-    print("|I| within [",np.min(Iabs),np.max(Iabs),"]")
+    print("|Re(Omega_prime)| within [",np.min(Rabs),np.max(Rabs),"]")
+    print("|Im(Omega_prime)| within [",np.min(Iabs),np.max(Iabs),"]")
     print()
     Imax = np.max(I, axis=1)
     imax = np.argmax(Imax)
-    kmax = kgrid[imax]
-    print("kmax = ",kmax/(hbar*c),"cm^-1")
-    print("|kmax| = ", np.linalg.norm(kmax)/(hbar*c),"cm^-1")
-    print("1/lambda =", np.linalg.norm(kmax)/(hbar*c)/(2.*np.pi),"cm^-1")
+    kprime_max = kprime_grid[imax]
+    print("kprime_max = ",kprime_max/(hbar*c),"cm^-1")
+    print("|kprime_max| = ", np.linalg.norm(kprime_max)/(hbar*c),"cm^-1")
+    print("1/lambda =", np.linalg.norm(kprime_max)/(hbar*c)/(2.*np.pi),"cm^-1")
     print()   
     
     #----------
@@ -300,8 +336,8 @@ def compute_all_eigenvalues():
     fout["N (1|ccm)"] = N
     fout["F (1|ccm)"] = F
     fout["P (1|ccm)"] = P
-    fout["kgrid (erg)"] = kgrid
-    fout["eigenvalues (erg)"] = eigenvalues
+    fout["kprime_grid (erg)"] = kprime_grid
+    fout["omegaprime (erg)"] = eigenvalues
     fout.close()
 
 if __name__ == '__main__':
