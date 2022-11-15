@@ -117,13 +117,10 @@ Feebar = np.array([ 0.07237959,  0.03132354, -0.3446878 ]) * Neebar
 Fxx    = np.array([-0.02165833,  0.07431613, -0.53545951]) * Nxx
 Fxxbar = Fxx
 
-def construct_S_nok(Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar):
+def construct_S_nok(Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout):
     #==========================#
     # Construct N and F arrays #
     #==========================#
-    global N
-    global F
-    global P
     N = np.array([[Nee   , Nxx   ],
                   [Neebar, Nxxbar]]) # [nu/nubar, flavor]
     N_FT = np.sum(N, axis=1)         # [nu/nubar]
@@ -208,9 +205,6 @@ def construct_S_nok(Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar):
     #----------
     # get vmatter and phis (all in ergs)
     #----------
-    global Ve
-    global phi0
-    global phi1
     mu_N = np.sqrt(2.) * GF * (N[:,0]     - N[:,1]    ) # [nu/nubar]
     mu_F = np.sqrt(2.) * GF * (F[:,0,:]   - F[:,1,:]  ) # [nu/nubar, i]
     mu_P = np.sqrt(2.) * GF * (P[:,0,:,:] - P[:,1,:,:]) # [nu/nubar, i, j]
@@ -249,6 +243,16 @@ def construct_S_nok(Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar):
     S_nok[4:8, 4:8] = -mu[1]
     print("\nS_nok:")
     print(S_nok)
+
+    #----------
+    # output data
+    #----------
+    fout["Ve (erg)"] = Ve
+    fout["phi0 (erg)"] = phi0
+    fout["phi1 (erg)"] = phi1
+    fout["N (1|ccm)"] = N
+    fout["F (1|ccm)"] = F
+    fout["P (1|ccm)"] = P
 
     return phi1mag
 
@@ -313,7 +317,7 @@ def eigenvalues_single_k(kprime):
 #===========================================#
 # do all eigenvalue calculations for a file #
 #===========================================#
-def compute_all_eigenvalues(kprime_grid):
+def compute_all_eigenvalues(kprime_grid, fout):
     #----------
     # loop over radii
     #----------
@@ -352,26 +356,21 @@ def compute_all_eigenvalues(kprime_grid):
     print()   
     
     #----------
+    # output data
+    #----------
+    fout["kprime_grid (erg)"] = kprime_grid
+    fout["omegaprime (erg)"] = eigenvalues
+
+if __name__ == '__main__':
+    #----------
     # set output filename
     #----------
     output_filename = "moment_eigenvalues.h5"
     print("Writing",output_filename)
-
-    #----------
-    # output data
-    #----------
     fout = h5py.File(output_filename, "w")
-    fout["Ve (erg)"] = Ve
-    fout["phi0 (erg)"] = phi0
-    fout["phi1 (erg)"] = phi1
-    fout["N (1|ccm)"] = N
-    fout["F (1|ccm)"] = F
-    fout["P (1|ccm)"] = P
-    fout["kprime_grid (erg)"] = kprime_grid
-    fout["omegaprime (erg)"] = eigenvalues
-    fout.close()
 
-if __name__ == '__main__':
-    phi1mag = construct_S_nok(Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar)
+    phi1mag = construct_S_nok(Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout)
     kprime_grid = construct_kprime_grid(phi1mag, max_ktarget_multiplier, min_ktarget_multiplier, numb_k)
-    compute_all_eigenvalues(kprime_grid)
+    compute_all_eigenvalues(kprime_grid, fout)
+
+    fout.close()
