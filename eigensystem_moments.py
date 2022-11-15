@@ -52,74 +52,14 @@ Mp = 1.6726219e-24 # g
 S_nok_RA = mp.RawArray('d',8*8)
 C_RA = mp.RawArray('d',2*3*3)
 
-
 #========#
 # inputs #
 #========#
-flavor_trace_chi = True  # in calculation of P. Always true in Cij
-flavor_trace_fhat = True # in calculation of P. Always true in Cij
-dm2 = 2.4e-3 * eV**2 # erg
-nthreads = 2
-rho = 0 # g/ccm
-Ye = 0.5
-average_energy = 50*MeV # erg
+#dm2 = 2.4e-3 * eV**2 # erg
+#nthreads = 2
+#average_energy = 50*MeV # erg
 
-#numb_k = 10
-#nphi_at_equator = 16
-#min_ktarget_multiplier = 1e-1
-#max_ktarget_multiplier = 1e1
-#Nee    = 4.89e32
-#Neebar = 4.89e32
-#Nxx    = 0
-#Nxxbar = 0
-#Fee    = np.array([0,0,  1./3]) * Nee
-#Feebar = np.array([0,0, -1./3]) * Neebar
-#Fxx    = np.array([0,0,  0   ])
-#Fxxbar = np.array([0,0,  0   ])
-
-# 90Degree case
-#numb_k = 200
-#nphi_at_equator = 64
-#min_ktarget_multiplier = 1
-#max_ktarget_multiplier = 3
-#Nee    = 4.89e32
-#Neebar = 4.89e32
-#Nxx    = 0
-#Nxxbar = 0
-#Fee    = np.array([0, 0   , 1./3]) * Nee
-#Feebar = np.array([0, 1/3., 0   ]) * Neebar
-#Fxx    = np.array([0, 0   , 0   ])
-#Fxxbar = np.array([0, 0   , 0   ])
-
-# TwoThirds case
-#numb_k = 200
-#nphi_at_equator = 64
-#min_ktarget_multiplier = 0.1
-#max_ktarget_multiplier = 3
-#Nee    = 4.89e32
-#Neebar = 4.89e32 * 2./3.
-#Nxx    = 0
-#Nxxbar = 0
-#Fee    = np.array([0,0,  0   ]) * Nee
-#Feebar = np.array([0,0, -1./3]) * Neebar
-#Fxx    = np.array([0,0,  0   ])
-#Fxxbar = np.array([0,0,  0   ])
-
-# NSM case
-numb_k = 200
-nphi_at_equator = 32
-min_ktarget_multiplier = 0.01
-max_ktarget_multiplier = 5
-Nee    = 1.421954234999705e+33
-Neebar = 1.9146237131657563e+33
-Nxx    = 1.9645407875568215e+33
-Nxxbar = Nxx
-Fee    = np.array([0.0974572,    0.04217632, -0.13433261]) * Nee
-Feebar = np.array([ 0.07237959,  0.03132354, -0.3446878 ]) * Neebar
-Fxx    = np.array([-0.02165833,  0.07431613, -0.53545951]) * Nxx
-Fxxbar = Fxx
-
-def construct_S_nok(Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout):
+def construct_S_nok(rho, Ye, Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout, flavor_trace_chi, flavor_trace_fhat):
     #==========================#
     # Construct N and F arrays #
     #==========================#
@@ -321,7 +261,7 @@ def eigenvalues_single_k(kprime):
 #===========================================#
 # do all eigenvalue calculations for a file #
 #===========================================#
-def compute_all_eigenvalues(kprime_grid, fout):
+def compute_all_eigenvalues(kprime_grid, fout, nthreads):
     #----------
     # loop over radii
     #----------
@@ -366,6 +306,70 @@ def compute_all_eigenvalues(kprime_grid, fout):
     fout["omegaprime (erg)"] = eigenvalues
 
 if __name__ == '__main__':
+    flavor_trace_chi = True  # in calculation of P. Always true in Cij
+    flavor_trace_fhat = True # in calculation of P. Always true in Cij
+    rho = 0 # g/ccm
+    Ye = 0.5
+    nthreads = 2
+    
+    #--------
+    # initial conditions
+    #--------
+    #numb_k = 10
+    #nphi_at_equator = 16
+    #min_ktarget_multiplier = 1e-1
+    #max_ktarget_multiplier = 1e1
+    #Nee    = 4.89e32
+    #Neebar = 4.89e32
+    #Nxx    = 0
+    #Nxxbar = 0
+    #Fee    = np.array([0,0,  1./3]) * Nee
+    #Feebar = np.array([0,0, -1./3]) * Neebar
+    #Fxx    = np.array([0,0,  0   ])
+    #Fxxbar = np.array([0,0,  0   ])
+    
+    # 90Degree case
+    #numb_k = 200
+    #nphi_at_equator = 64
+    #min_ktarget_multiplier = 1
+    #max_ktarget_multiplier = 3
+    #Nee    = 4.89e32
+    #Neebar = 4.89e32
+    #Nxx    = 0
+    #Nxxbar = 0
+    #Fee    = np.array([0, 0   , 1./3]) * Nee
+    #Feebar = np.array([0, 1/3., 0   ]) * Neebar
+    #Fxx    = np.array([0, 0   , 0   ])
+    #Fxxbar = np.array([0, 0   , 0   ])
+    
+    # TwoThirds case
+    #numb_k = 200
+    #nphi_at_equator = 64
+    #min_ktarget_multiplier = 0.1
+    #max_ktarget_multiplier = 3
+    #Nee    = 4.89e32
+    #Neebar = 4.89e32 * 2./3.
+    #Nxx    = 0
+    #Nxxbar = 0
+    #Fee    = np.array([0,0,  0   ]) * Nee
+    #Feebar = np.array([0,0, -1./3]) * Neebar
+    #Fxx    = np.array([0,0,  0   ])
+    #Fxxbar = np.array([0,0,  0   ])
+    
+    # NSM case
+    numb_k = 200
+    nphi_at_equator = 32
+    min_ktarget_multiplier = 0.01
+    max_ktarget_multiplier = 5
+    Nee    = 1.421954234999705e+33
+    Neebar = 1.9146237131657563e+33
+    Nxx    = 1.9645407875568215e+33
+    Nxxbar = Nxx
+    Fee    = np.array([0.0974572,    0.04217632, -0.13433261]) * Nee
+    Feebar = np.array([ 0.07237959,  0.03132354, -0.3446878 ]) * Neebar
+    Fxx    = np.array([-0.02165833,  0.07431613, -0.53545951]) * Nxx
+    Fxxbar = Fxx
+
     #----------
     # set output filename
     #----------
@@ -373,8 +377,8 @@ if __name__ == '__main__':
     print("Writing",output_filename)
     fout = h5py.File(output_filename, "w")
 
-    phi1mag = construct_S_nok(Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout)
+    phi1mag = construct_S_nok(rho, Ye, Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout, flavor_trace_chi, flavor_trace_fhat)
     kprime_grid = construct_kprime_grid(phi1mag, max_ktarget_multiplier, min_ktarget_multiplier, numb_k)
-    compute_all_eigenvalues(kprime_grid, fout)
+    compute_all_eigenvalues(kprime_grid, fout, nthreads)
 
     fout.close()
