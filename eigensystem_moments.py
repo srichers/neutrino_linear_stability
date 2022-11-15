@@ -50,6 +50,8 @@ Mp = 1.6726219e-24 # g
 
 # Define shared memory block outside of functions
 S_nok_RA = mp.RawArray('d',8*8)
+C_RA = mp.RawArray('d',2*3*3)
+
 
 #========#
 # inputs #
@@ -190,15 +192,16 @@ def construct_S_nok(Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout):
     P    = Ptilde    * N[:,:,np.newaxis,np.newaxis] # [nu/nubar, flavor, i, j]
     print("\nP:")
     print(P)
-    print(np.shape(P))
-    print(np.shape(P_FT))
+    print("P shape:",np.shape(P))
+    print("P_FT shape:",np.shape(P_FT))
     
     
     #=====================================#
     # Set Cij to the flavor-traced Ptilde #
     #=====================================#
-    global C
-    C = Ptilde_FT # [nu/nubar, i, j]
+    C = np.frombuffer(C_RA).reshape((2,3,3))
+    C[:,:,:] = Ptilde_FT # [nu/nubar, i, j]
+    print("C shape:", np.shape(C))
     print("C=")
     print(C)
     
@@ -303,6 +306,7 @@ def construct_kprime_grid(phi1mag, max_ktarget_multiplier, min_ktarget_multiplie
 # k:erg output:erg
 def eigenvalues_single_k(kprime):
     # complete the stability matrix
+    C = np.frombuffer(C_RA).reshape((2,3,3))
     S_nok = np.frombuffer(S_nok_RA).reshape((8,8))
     S = copy.deepcopy(S_nok)
     S[0  , 1:4] -= kprime
