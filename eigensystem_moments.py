@@ -53,14 +53,10 @@ Mp = 1.6726219e-24 # g
 S_nok_RA = mp.RawArray('d',8*8)
 C_RA = mp.RawArray('d',2*3*3)
 
-#========#
-# inputs #
-#========#
-# note: the analysis now operates in the FFI limit, so there is no place for the neutrino mass or energy
-#dm2 = 2.4e-3 * eV**2 # erg
-#average_energy = 50*MeV # erg
-
 def construct_S_nok(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, verbose=False):
+    N = copy.deepcopy(N)
+    F = copy.deepcopy(F)
+    
     # normalize by the total number of neutrinos
     Ntot = np.sum(N)
     N /= Ntot
@@ -183,7 +179,6 @@ def construct_S_nok(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, verbose=
     
     # Stability matrix without k term
     S_nok = np.frombuffer(S_nok_RA).reshape((8,8))
-    #S_nok = np.zeros((8,8))
     S_nok[0:4, 0:4] =  mu[0]
     S_nok[0:4, 4:8] = -mu[0]
     S_nok[4:8, 0:4] =  mu[1]
@@ -199,7 +194,6 @@ def construct_kprime_grid(phi1mag, max_ktarget_multiplier, numb_k, nphi_at_equat
     dkprime = max_ktarget_multiplier/numb_k
     kprime_mag_grid = phi1mag * np.arange(dkprime, max_ktarget_multiplier, dkprime)
     print("Using",len(kprime_mag_grid),"kprime_mag points")
-    #kprime_mag_grid = phi1mag * np.geomspace(max_ktarget_multiplier,num=numb_k,endpoint=True)    
     
     # build uniform covering of unit sphere
     dtheta = np.pi * np.sqrt(3) / nphi_at_equator
@@ -249,14 +243,17 @@ def eigenvalues_single_k(kprime):
     # find the eigenvalues
     return np.linalg.eigvals(S)
 
+# kprime:cm^-1 eigenvaluesprime:erg
+# k:cm^-1 eigenvalues:erg
+def k_from_kprime(rho, Ye, N, F, kprime, eigenvaluesprime):
+    k = kprime + np.sqrt(2)*GF/(hbar*c) * ( (F[0,0]-F[0,1]) - (F[1,0]-F[1,1]) )[np.newaxis,:]
+    eigenvalues = eigenvaluesprime + np.sqrt(2)*GF/(hbar*c) * ( (N[0,0]-N[0,1]) - (N[1,0]-N[1,1]) )
+    return k, eigenvalues
 
 #===========================================#
 # do all eigenvalue calculations for a file #
 #===========================================#
 def compute_all_eigenvalues(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, numb_k, nphi_at_equator, max_ktarget_multiplier, nthreads):
-    N = copy.deepcopy(N)
-    F = copy.deepcopy(F)
-
     # set up the shared data
     phi1mag, Ntot = construct_S_nok(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat)
     units = GF*Ntot # erg
@@ -265,9 +262,6 @@ def compute_all_eigenvalues(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, 
     #----------
     # loop over k points
     #----------
-    #eigenvalues = []
-    #for kprime in kprime_grid:
-    #    eigenvalues.append(eigenvalues_single_k(kprime))
     with mp.Pool(processes=nthreads) as pool:
         eigenvalues = pool.map(eigenvalues_single_k, kprime_grid)
     eigenvalues = np.array(eigenvalues)
@@ -278,7 +272,6 @@ def compute_all_eigenvalues(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, 
     #----------
     # output data
     #----------
-    print_info(kprime_grid, eigenvalues)
     output_filename = "moment_eigenvalues.h5"
     print("Writing",output_filename)
     fout = h5py.File(output_filename, "w")
@@ -286,16 +279,13 @@ def compute_all_eigenvalues(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, 
     fout["omegaprime (erg)"] = eigenvalues
     fout.close()
 
-    return eigenvalues
+    return kprime_grid, eigenvalues
 
 
 #=====================================#
 # optimize to find the max eigenvalue #
 #=====================================#
 def compute_max_eigenvalue(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, max_ktarget_multiplier):
-    N = copy.deepcopy(N)
-    F = copy.deepcopy(F)
-    
     # set up the shared data
     phi1mag, Ntot = construct_S_nok(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat)
     units = GF*Ntot # erg
@@ -318,10 +308,10 @@ def compute_max_eigenvalue(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, m
     eigenvalues *= units
 
     print(result.message)
-    print_info([kmax], [eigenvalues])
-    return kmax, eigenvalues
+    return np.array([kmax]), np.array([eigenvalues])
 
 def print_info(kprime_grid, eigenvalues):
+    k_mag_max = np.max(np.sqrt(np.sum(kprime_grid**2,axis=1)))
     print("Using",len(kprime_grid),"kprime points up to","{:e}".format(np.max(kprime_grid)/(hbar*c)),"cm^-1")
     R = np.real(eigenvalues)
     I = np.imag(eigenvalues)
@@ -347,10 +337,6 @@ if __name__ == '__main__':
     #--------
     # initial conditions
     #--------
-    #numb_k = 10
-    #nphi_at_equator = 16
-    #min_ktarget_multiplier = 1e-1
-    #max_ktarget_multiplier = 1e1
     #Nee    = 4.89e32
     #Neebar = 4.89e32
     #Nxx    = 0
@@ -361,10 +347,6 @@ if __name__ == '__main__':
     #Fxxbar = np.array([0,0,  0   ])
     
     # 90Degree case
-    #numb_k = 200
-    #nphi_at_equator = 64
-    #min_ktarget_multiplier = 1
-    #max_ktarget_multiplier = 3
     #Nee    = 4.89e32
     #Neebar = 4.89e32
     #Nxx    = 0
@@ -375,10 +357,6 @@ if __name__ == '__main__':
     #Fxxbar = np.array([0, 0   , 0   ])
     
     # TwoThirds case
-    #numb_k = 200
-    #nphi_at_equator = 64
-    #min_ktarget_multiplier = 0.1
-    #max_ktarget_multiplier = 3
     #Nee    = 4.89e32
     #Neebar = 4.89e32 * 2./3.
     #Nxx    = 0
@@ -389,8 +367,6 @@ if __name__ == '__main__':
     #Fxxbar = np.array([0,0,  0   ])
     
     # NSM case
-    #min_ktarget_multiplier = 0.01
-    max_ktarget_multiplier = 0.1
     Nee    = 1.421954234999705e+33
     Neebar = 1.9146237131657563e+33
     Nxx    = 1.9645407875568215e+33
@@ -405,6 +381,8 @@ if __name__ == '__main__':
     #==========================#
     flavor_trace_chi = True  # in calculation of P. Always true in Cij
     flavor_trace_fhat = True # in calculation of P. Always true in Cij
+    max_ktarget_multiplier = 10
+
     rho = 0 # g/ccm
     Ye = 0.5
     nthreads = 8
@@ -415,12 +393,26 @@ if __name__ == '__main__':
 
 
     # global optimizer
-    print(" ### SHGO OPTIMIZER ###")
-    kmax_opt, eigenvalues_opt = compute_max_eigenvalue(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, max_ktarget_multiplier)
+    print(" ### SHGO OPTIMIZER ### flavor_trace_chi==True flavor_trace_fhat==True")
+    kmax_opt, eigenvalues_opt = compute_max_eigenvalue(rho, Ye, N, F, True, True, max_ktarget_multiplier)
+    print_info(kmax_opt, eigenvalues_opt)
+
+    print(" ### SHGO OPTIMIZER ### flavor_trace_chi==True flavor_trace_fhat==False")
+    kmax_opt, eigenvalues_opt = compute_max_eigenvalue(rho, Ye, N, F, True, False, max_ktarget_multiplier)
+    print_info(kmax_opt, eigenvalues_opt)
+
+    print(" ### SHGO OPTIMIZER ### flavor_trace_chi==False flavor_trace_fhat==True")
+    kmax_opt, eigenvalues_opt = compute_max_eigenvalue(rho, Ye, N, F, False, True, max_ktarget_multiplier)
+    print_info(kmax_opt, eigenvalues_opt)
+
+    print(" ### SHGO OPTIMIZER ### flavor_trace_chi==False flavor_trace_fhat==False")
+    kmax_opt, eigenvalues_opt = compute_max_eigenvalue(rho, Ye, N, F, False, False, max_ktarget_multiplier)
+    print_info(kmax_opt, eigenvalues_opt)
 
     # compute full grid
     print(" ### GRID SEARCH ###")
     numb_k = 200
     nphi_at_equator = 32
-    eigenvalues = compute_all_eigenvalues(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, numb_k, nphi_at_equator, max_ktarget_multiplier, nthreads)
+    kprime_grid, eigenvalues = compute_all_eigenvalues(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, numb_k, nphi_at_equator, max_ktarget_multiplier, nthreads)
+    print_info(kprime_grid, eigenvalues)
 
