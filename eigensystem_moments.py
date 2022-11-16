@@ -60,15 +60,7 @@ C_RA = mp.RawArray('d',2*3*3)
 #dm2 = 2.4e-3 * eV**2 # erg
 #average_energy = 50*MeV # erg
 
-def construct_S_nok(rho, Ye, Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, flavor_trace_chi, flavor_trace_fhat, verbose=False):
-    #==========================#
-    # Construct N and F arrays #
-    #==========================#
-    N = np.array([[Nee   , Nxx   ],
-                  [Neebar, Nxxbar]]) # [nu/nubar, flavor]
-    F = np.array([[Fee   , Fxx   ],
-                  [Feebar, Fxxbar]]) # [nu/nubar, flavor, i]
-
+def construct_S_nok(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, verbose=False):
     # normalize by the total number of neutrinos
     Ntot = np.sum(N)
     N /= Ntot
@@ -200,21 +192,14 @@ def construct_S_nok(rho, Ye, Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, flavor
         print("\nS_nok:")
         print(S_nok)
 
-    #----------
-    # output data
-    #----------
+    return phi1mag, Ntot
 
-    return phi1mag, Ntot, Ve, phi0, phi1, N, F, P
-
-def construct_kprime_grid(phi1mag, max_ktarget_multiplier, min_ktarget_multiplier, numb_k):
+def construct_kprime_grid(phi1mag, max_ktarget_multiplier, numb_k, nphi_at_equator):
     # build the kprime grid
-    dkprime = (max_ktarget_multiplier - min_ktarget_multiplier)/numb_k
-    kprime_mag_grid = phi1mag * np.arange(min_ktarget_multiplier, max_ktarget_multiplier, dkprime)
-    #kprime_mag_grid = phi1mag * np.geomspace(min_ktarget_multiplier,max_ktarget_multiplier,num=numb_k,endpoint=True)
-    print()
-    print("Using",len(kprime_mag_grid),"kprime_mag points between",kprime_mag_grid[0]/(hbar*c),"and",kprime_mag_grid[-1]/(hbar*c),"cm^-1")
-    print("dkprime =",dkprime,"cm^-1") # 
-    
+    dkprime = max_ktarget_multiplier/numb_k
+    kprime_mag_grid = phi1mag * np.arange(dkprime, max_ktarget_multiplier, dkprime)
+    print("Using",len(kprime_mag_grid),"kprime_mag points")
+    #kprime_mag_grid = phi1mag * np.geomspace(max_ktarget_multiplier,num=numb_k,endpoint=True)    
     
     # build uniform covering of unit sphere
     dtheta = np.pi * np.sqrt(3) / nphi_at_equator
@@ -268,7 +253,14 @@ def eigenvalues_single_k(kprime):
 #===========================================#
 # do all eigenvalue calculations for a file #
 #===========================================#
-def compute_all_eigenvalues(kprime_grid, nthreads):
+def compute_all_eigenvalues(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, numb_k, nphi_at_equator, max_ktarget_multiplier, nthreads):
+    N = copy.deepcopy(N)
+    F = copy.deepcopy(F)
+
+    # set up the shared data
+    phi1mag, Ntot = construct_S_nok(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat)
+    units = GF*Ntot # erg
+    kprime_grid = construct_kprime_grid(phi1mag, max_ktarget_multiplier, numb_k, nphi_at_equator)
 
     #----------
     # loop over k points
@@ -278,14 +270,36 @@ def compute_all_eigenvalues(kprime_grid, nthreads):
     #    eigenvalues.append(eigenvalues_single_k(kprime))
     with mp.Pool(processes=nthreads) as pool:
         eigenvalues = pool.map(eigenvalues_single_k, kprime_grid)
-    
-    return np.array(eigenvalues)
+    eigenvalues = np.array(eigenvalues)
+        
+    kprime_grid *= units
+    eigenvalues *= units
+
+    #----------
+    # output data
+    #----------
+    print_info(kprime_grid, eigenvalues)
+    output_filename = "moment_eigenvalues.h5"
+    print("Writing",output_filename)
+    fout = h5py.File(output_filename, "w")
+    fout["kprime_grid (erg)"] = kprime_grid
+    fout["omegaprime (erg)"] = eigenvalues
+    fout.close()
+
+    return eigenvalues
 
 
 #=====================================#
 # optimize to find the max eigenvalue #
 #=====================================#
-def compute_max_eigenvalue(phi1mag, max_ktarget_multiplier):
+def compute_max_eigenvalue(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, max_ktarget_multiplier):
+    N = copy.deepcopy(N)
+    F = copy.deepcopy(F)
+    
+    # set up the shared data
+    phi1mag, Ntot = construct_S_nok(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat)
+    units = GF*Ntot # erg
+
     # function that optimizer will use
     def max_eigenval_single_k(kprime):
         evals = eigenvalues_single_k(kprime)
@@ -299,35 +313,36 @@ def compute_max_eigenvalue(phi1mag, max_ktarget_multiplier):
 
     kmax = result.x
     eigenvalues = eigenvalues_single_k(kmax)
-    return np.array(result.x), eigenvalues
+
+    kmax *= units
+    eigenvalues *= units
+
+    print(result.message)
+    print_info([kmax], [eigenvalues])
+    return kmax, eigenvalues
 
 def print_info(kprime_grid, eigenvalues):
-    print()
+    print("Using",len(kprime_grid),"kprime points up to","{:e}".format(np.max(kprime_grid)/(hbar*c)),"cm^-1")
     R = np.real(eigenvalues)
     I = np.imag(eigenvalues)
-    print("Re(Omega_prime) within [","{:e}".format(np.min(R)/hbar),"{:e}".format(np.max(R)/hbar),"] s^-1")
-    print("Im(Omega_prime) within [","{:e}".format(np.min(I)/hbar),"{:e}".format(np.max(I)/hbar),"] s^-1")
+    #print("Re(Omega_prime) within [","{:e}".format(np.min(R)/hbar),"{:e}".format(np.max(R)/hbar),"] s^-1")
+    #print("Im(Omega_prime) within [","{:e}".format(np.min(I)/hbar),"{:e}".format(np.max(I)/hbar),"] s^-1")
     Rabs = np.abs(R)
     Iabs = np.abs(I)
-    print("|Re(Omega_prime)| within [","{:e}".format(np.min(Rabs)/hbar),"{:e}".format(np.max(Rabs)/hbar),"] s^-1")
-    print("|Im(Omega_prime)| within [","{:e}".format(np.min(Iabs)/hbar),"{:e}".format(np.max(Iabs)/hbar),"] s^-1")
-    print()
+    #print("|Re(Omega_prime)| within [","{:e}".format(np.min(Rabs)/hbar),"{:e}".format(np.max(Rabs)/hbar),"] s^-1")
+    #print("|Im(Omega_prime)| within [","{:e}".format(np.min(Iabs)/hbar),"{:e}".format(np.max(Iabs)/hbar),"] s^-1")
+    #print()
     Imax = np.max(I, axis=1)
     imax = np.argmax(Imax)
     kprime_max = kprime_grid[imax]
     print("kprime_max = ",kprime_max/(hbar*c),"cm^-1")
     print("|kprime_max| = ", "{:e}".format(np.linalg.norm(kprime_max)/(hbar*c)),"cm^-1")
-    print("1/lambda =", "{:e}".format(np.linalg.norm(kprime_max)/(hbar*c)/(2.*np.pi)),"cm^-1")
+    print("lambda =", "{:e}".format((2.*np.pi*hbar*c)/np.linalg.norm(kprime_max)),"cm^-1")
     print("max_growthrate =","{:e}".format(np.max(I)/hbar),"s^-1")
     print()
 
     
 if __name__ == '__main__':
-    flavor_trace_chi = True  # in calculation of P. Always true in Cij
-    flavor_trace_fhat = True # in calculation of P. Always true in Cij
-    rho = 0 # g/ccm
-    Ye = 0.5
-    nthreads = 8
     
     #--------
     # initial conditions
@@ -374,10 +389,8 @@ if __name__ == '__main__':
     #Fxxbar = np.array([0,0,  0   ])
     
     # NSM case
-    numb_k = 200
-    nphi_at_equator = 32
-    min_ktarget_multiplier = 0.01
-    max_ktarget_multiplier = 5
+    #min_ktarget_multiplier = 0.01
+    max_ktarget_multiplier = 0.1
     Nee    = 1.421954234999705e+33
     Neebar = 1.9146237131657563e+33
     Nxx    = 1.9645407875568215e+33
@@ -387,39 +400,27 @@ if __name__ == '__main__':
     Fxx    = np.array([-0.02165833,  0.07431613, -0.53545951]) * Nxx
     Fxxbar = Fxx
 
-    # set up the shared data
-    phi1mag, Ntot, Ve, phi0, phi1, N, F, P = construct_S_nok(rho, Ye, Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, flavor_trace_chi, flavor_trace_fhat)
-    units = GF*Ntot # erg
+    #==========================#
+    # Construct N and F arrays #
+    #==========================#
+    flavor_trace_chi = True  # in calculation of P. Always true in Cij
+    flavor_trace_fhat = True # in calculation of P. Always true in Cij
+    rho = 0 # g/ccm
+    Ye = 0.5
+    nthreads = 8
+    N = np.array([[Nee   , Nxx   ],
+                  [Neebar, Nxxbar]]) # [nu/nubar, flavor]
+    F = np.array([[Fee   , Fxx   ],
+                  [Feebar, Fxxbar]]) # [nu/nubar, flavor, i]
+
 
     # global optimizer
     print(" ### SHGO OPTIMIZER ###")
-    kmax_opt, eigenvalues_opt = compute_max_eigenvalue(phi1mag, max_ktarget_multiplier)
-    kmax_opt *= units
-    eigenvalues_opt *= units
+    kmax_opt, eigenvalues_opt = compute_max_eigenvalue(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, max_ktarget_multiplier)
 
     # compute full grid
     print(" ### GRID SEARCH ###")
-    kprime_grid = construct_kprime_grid(phi1mag, max_ktarget_multiplier, min_ktarget_multiplier, numb_k)
-    eigenvalues = compute_all_eigenvalues(kprime_grid, nthreads)
-    kprime_grid *= units
-    eigenvalues *= units
+    numb_k = 200
+    nphi_at_equator = 32
+    eigenvalues = compute_all_eigenvalues(rho, Ye, N, F, flavor_trace_chi, flavor_trace_fhat, numb_k, nphi_at_equator, max_ktarget_multiplier, nthreads)
 
-    # print info to screen
-    print_info([kmax_opt], [eigenvalues_opt])
-    print_info(kprime_grid, eigenvalues)
-    
-    #----------
-    # output data
-    #----------
-    output_filename = "moment_eigenvalues.h5"
-    print("Writing",output_filename)
-    fout = h5py.File(output_filename, "w")
-    fout["Ve (erg)"] = Ve
-    fout["phi0 (erg)"] = phi0
-    fout["phi1 (erg)"] = phi1
-    fout["N (1|ccm)"] = N
-    fout["F (1|ccm)"] = F
-    fout["P (1|ccm)"] = P
-    fout["kprime_grid (erg)"] = kprime_grid
-    fout["omegaprime (erg)"] = eigenvalues
-    fout.close()
