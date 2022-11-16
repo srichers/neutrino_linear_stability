@@ -209,7 +209,7 @@ def construct_S_nok(rho, Ye, Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout, 
 
 def construct_kprime_grid(phi1mag, max_ktarget_multiplier, min_ktarget_multiplier, numb_k):
     # build the kprime grid
-    dkprime = phi1mag * (max_ktarget_multiplier - min_ktarget_multiplier)/numb_k / (hbar*c)
+    dkprime = (max_ktarget_multiplier - min_ktarget_multiplier)/numb_k
     kprime_mag_grid = phi1mag * np.arange(min_ktarget_multiplier, max_ktarget_multiplier, dkprime)
     #kprime_mag_grid = phi1mag * np.geomspace(min_ktarget_multiplier,max_ktarget_multiplier,num=numb_k,endpoint=True)
     print()
