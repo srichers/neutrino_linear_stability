@@ -272,16 +272,6 @@ def compute_all_eigenvalues(ne, N, F, flavor_trace_chi, flavor_trace_fhat, numb_
     # restore units
     k_grid, eigenvalues = restore_units(ne, N, F, kprime_grid, eigenvaluesprime)
 
-    #----------
-    # output data
-    #----------
-    output_filename = "moment_eigenvalues.h5"
-    print("Writing",output_filename)
-    fout = h5py.File(output_filename, "w")
-    fout["k_grid (erg)"] = k_grid
-    fout["omega (erg)"] = eigenvalues
-    fout.close()
-
     return k_grid, eigenvalues
 
 
@@ -404,6 +394,14 @@ if __name__ == '__main__':
     print("### GRID SEARCH ###")
     numb_k = 200
     nphi_at_equator = 32
-    kprime_grid, eigenvalues = compute_all_eigenvalues(ne, N, F, flavor_trace_chi, flavor_trace_fhat, numb_k, nphi_at_equator, max_ktarget_multiplier, nthreads)
-    print_info(kprime_grid, eigenvalues)
+    k_grid, eigenvalues = compute_all_eigenvalues(ne, N, F, flavor_trace_chi, flavor_trace_fhat, numb_k, nphi_at_equator, max_ktarget_multiplier, nthreads)
+    print_info(k_grid, eigenvalues)
+
+    # output data from grid search
+    output_filename = "moment_eigenvalues.h5"
+    print("Writing",output_filename)
+    fout = h5py.File(output_filename, "w")
+    fout["k_grid (erg)"] = k_grid
+    fout["omega (erg)"] = eigenvalues
+    fout.close()
 
