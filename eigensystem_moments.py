@@ -34,6 +34,7 @@ import glob
 import scipy.linalg
 import copy
 import multiprocessing as mp
+from scipy.optimize import minimize, Bounds, basinhopping
 np.set_printoptions(linewidth=200)
 
 #===========#
@@ -55,25 +56,27 @@ C_RA = mp.RawArray('d',2*3*3)
 #========#
 # inputs #
 #========#
+# note: the analysis now operates in the FFI limit, so there is no place for the neutrino mass or energy
 #dm2 = 2.4e-3 * eV**2 # erg
-#nthreads = 2
 #average_energy = 50*MeV # erg
 
-def construct_S_nok(rho, Ye, Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout, flavor_trace_chi, flavor_trace_fhat):
+def construct_S_nok(rho, Ye, Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout, flavor_trace_chi, flavor_trace_fhat, verbose=False):
     #==========================#
     # Construct N and F arrays #
     #==========================#
     N = np.array([[Nee   , Nxx   ],
                   [Neebar, Nxxbar]]) # [nu/nubar, flavor]
     N_FT = np.sum(N, axis=1)         # [nu/nubar]
-    print("\nN:")
-    print(N)
+    if(verbose):
+        print("\nN:")
+        print(N)
     
     F = np.array([[Fee   , Fxx   ],
                   [Feebar, Fxxbar]]) # [nu/nubar, flavor, i]
     F_FT = np.sum(F, axis=1)         # [nu/nubar, i]
-    print("\nF:")
-    print(F)
+    if(verbose):
+        print("\nF:")
+        print(F)
     
     #====================================#
     # flux factors and flux unit vectors #
@@ -130,10 +133,11 @@ def construct_S_nok(rho, Ye, Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout, 
     #==================================#
     P_FT = Ptilde_FT * N_FT[:,np.newaxis,np.newaxis] # [nu/nubar, i, j]
     P    = Ptilde    * N[:,:,np.newaxis,np.newaxis] # [nu/nubar, flavor, i, j]
-    print("\nP:")
-    print(P)
-    print("P shape:",np.shape(P))
-    print("P_FT shape:",np.shape(P_FT))
+    if(verbose):
+        print("\nP:")
+        print(P)
+        print("P shape:",np.shape(P))
+        print("P_FT shape:",np.shape(P_FT))
     
     
     #=====================================#
@@ -141,9 +145,10 @@ def construct_S_nok(rho, Ye, Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout, 
     #=====================================#
     C = np.frombuffer(C_RA).reshape((2,3,3))
     C[:,:,:] = Ptilde_FT # [nu/nubar, i, j]
-    print("C shape:", np.shape(C))
-    print("C=")
-    print(C)
+    if(verbose):
+        print("C shape:", np.shape(C))
+        print("C=")
+        print(C)
     
     #----------
     # get vmatter and phis (all in ergs)
@@ -155,17 +160,18 @@ def construct_S_nok(rho, Ye, Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout, 
     phi0 = mu_N[0] - mu_N[1]
     phi1 = mu_F[0] - mu_F[1] # [i]
     phi1mag = np.sqrt(np.sum(phi1**2))
-    
-    print("\nphi0:")
-    print(phi0)
-    print("\nphi1:")
-    print(phi1)
-    print("\nmu_N:")
-    print(mu_N)
-    print("\nmu_F:")
-    print(mu_F)
-    print("\nmu_P:")
-    print(mu_P)
+
+    if(verbose):
+        print("\nphi0:")
+        print(phi0)
+        print("\nphi1:")
+        print(phi1)
+        print("\nmu_N:")
+        print(mu_N)
+        print("\nmu_F:")
+        print(mu_F)
+        print("\nmu_P:")
+        print(mu_P)
     
     
     # mu parts of the stability matrix [nu/nubar, i, j] where 0 is N and 1-3 are F
@@ -174,8 +180,9 @@ def construct_S_nok(rho, Ye, Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout, 
     mu[:, 0  , 1:4] = -mu_F
     mu[:, 1:4, 0  ] =  mu_F
     mu[:, 1:4, 1:4] = -mu_P
-    print("\nmu:")
-    print(mu)
+    if(verbose):
+        print("\nmu:")
+        print(mu)
     
     # Stability matrix without k term
     S_nok = np.frombuffer(S_nok_RA).reshape((8,8))
@@ -184,8 +191,9 @@ def construct_S_nok(rho, Ye, Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout, 
     S_nok[0:4, 4:8] = -mu[0]
     S_nok[4:8, 0:4] =  mu[1]
     S_nok[4:8, 4:8] = -mu[1]
-    print("\nS_nok:")
-    print(S_nok)
+    if(verbose):
+        print("\nS_nok:")
+        print(S_nok)
 
     #----------
     # output data
@@ -305,6 +313,52 @@ def compute_all_eigenvalues(kprime_grid, fout, nthreads):
     fout["kprime_grid (erg)"] = kprime_grid
     fout["omegaprime (erg)"] = eigenvalues
 
+
+#=====================================#
+# optimize to find the max eigenvalue #
+#=====================================#
+def compute_max_eigenvalue(phi1mag, max_ktarget_multiplier):
+    # function that optimizer will use
+    def eigenval_single_k(kprime):
+        evals = eigenvalues_single_k(kprime)
+        result = -np.max(np.imag(evals)) * 10
+        #print(result)
+        return result
+    
+    # initial guess
+    kprime_guess = [0,0,0] #phi1mag * np.array([0,0,1])
+
+    # bounds
+    kmax = phi1mag * max_ktarget_multiplier
+    kmin = -kmax
+    #bounds = ((kmin,kmax),(kmin,kmax),(kmin,kmax))
+    print()
+    print("x guess = ", kprime_guess)
+    print("y guess = ", eigenval_single_k(kprime_guess))
+
+    # let the optimizer do its thing
+    result_BH = basinhopping(eigenval_single_k, kprime_guess, T=1e-17, stepsize=1e-18, niter=2000, interval=10)
+    print()
+    print("x basinhopping = ", result_BH.x)
+    print("y basinhopping = ", result_BH.fun)
+    print(result_BH)
+
+    kprime_guess = result_BH.x
+    #result_CG = minimize(eigenval_single_k, kprime_guess, method = 'trust-constr', tol=1e-30, options={"xtol":1e-50})
+    result_CG = minimize(eigenval_single_k, kprime_guess, method = 'CG', tol=1e-25)
+    print()
+    print("x opt = ", result_CG.x)
+    print("y opt = ", result_CG.fun)
+    print(result_CG)
+
+#def f(x):
+#    return ((x[1])**2 + x[0]**2) * 1e-17
+#bounds = ((-2,2),(-2,2))
+#result = minimize(f, [1,1], tol=1e-20, bounds=bounds)
+#print(result)
+#exit()
+    
+    
 if __name__ == '__main__':
     flavor_trace_chi = True  # in calculation of P. Always true in Cij
     flavor_trace_fhat = True # in calculation of P. Always true in Cij
@@ -378,6 +432,9 @@ if __name__ == '__main__':
     fout = h5py.File(output_filename, "w")
 
     phi1mag = construct_S_nok(rho, Ye, Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout, flavor_trace_chi, flavor_trace_fhat)
+
+    compute_max_eigenvalue(phi1mag, max_ktarget_multiplier)
+
     kprime_grid = construct_kprime_grid(phi1mag, max_ktarget_multiplier, min_ktarget_multiplier, numb_k)
     compute_all_eigenvalues(kprime_grid, fout, nthreads)
 
