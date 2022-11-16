@@ -207,6 +207,19 @@ def construct_S_nok(rho, Ye, Nee,Neebar,Nxx,Nxxbar,Fee,Feebar,Fxx,Fxxbar, fout, 
 
     return phi1mag
 
+def remove_units(phi1mag):
+    S_nok = np.frombuffer(S_nok_RA).reshape((8,8))
+    C = np.frombuffer(C_RA).reshape((2,3,3))
+    S_nok /= phi1mag
+    C /= phi1mag
+
+def restore_units(phi1mag):
+    S_nok = np.frombuffer(S_nok_RA).reshape((8,8))
+    C = np.frombuffer(C_RA).reshape((2,3,3))
+    S_nok *= phi1mag
+    C *= phi1mag
+    
+
 def construct_kprime_grid(phi1mag, max_ktarget_multiplier, min_ktarget_multiplier, numb_k):
     # build the kprime grid
     dkprime = (max_ktarget_multiplier - min_ktarget_multiplier)/numb_k
@@ -292,12 +305,12 @@ def compute_all_eigenvalues(kprime_grid, fout, nthreads):
     R = np.real(eigenvalues)
     I = np.imag(eigenvalues)
     print("time="+"{:.2e}".format(end_time-start_time)+"s.")
-    print("Re(Omega_prime) within [",np.min(R)/hbar,np.max(R)/hbar,"] s^-1")
-    print("Im(Omega_prime) within [",np.min(I)/hbar,np.max(I)/hbar,"] s^-1")
+    print("Re(Omega_prime) within [",np.min(R)/hbar/1e10,np.max(R)/hbar/1e10,"] 1e10 s^-1")
+    print("Im(Omega_prime) within [",np.min(I)/hbar/1e10,np.max(I)/hbar/1e10,"] 1e10 s^-1")
     Rabs = np.abs(R)
     Iabs = np.abs(I)
-    print("|Re(Omega_prime)| within [",np.min(Rabs)/hbar,np.max(Rabs)/hbar,"] s^-1")
-    print("|Im(Omega_prime)| within [",np.min(Iabs)/hbar,np.max(Iabs)/hbar,"] s^-1")
+    print("|Re(Omega_prime)| within [",np.min(Rabs)/hbar/1e10,np.max(Rabs)/hbar/1e10,"] 1e10 s^-1")
+    print("|Im(Omega_prime)| within [",np.min(Iabs)/hbar/1e10,np.max(Iabs)/hbar/1e10,"] 1e10 s^-1")
     print()
     Imax = np.max(I, axis=1)
     imax = np.argmax(Imax)
@@ -321,35 +334,37 @@ def compute_max_eigenvalue(phi1mag, max_ktarget_multiplier):
     # function that optimizer will use
     def eigenval_single_k(kprime):
         evals = eigenvalues_single_k(kprime)
-        result = -np.max(np.imag(evals)) * 10
+        result = -np.max(np.imag(evals))
         #print(result)
         return result
-    
+
     # initial guess
-    kprime_guess = [0,0,0] #phi1mag * np.array([0,0,1])
+    kprime_guess = [0,0,phi1mag] #phi1mag * np.array([0,0,1])
 
     # bounds
     kmax = phi1mag * max_ktarget_multiplier
     kmin = -kmax
     #bounds = ((kmin,kmax),(kmin,kmax),(kmin,kmax))
     print()
-    print("x guess = ", kprime_guess)
-    print("y guess = ", eigenval_single_k(kprime_guess))
+    print("x guess = ", np.array(kprime_guess) / (hbar*c),"cm^-1")
+    print("y guess = ", -eigenval_single_k(kprime_guess)/hbar/1e10,"1e10 s^-1")
 
     # let the optimizer do its thing
-    result_BH = basinhopping(eigenval_single_k, kprime_guess, T=1e-17, stepsize=1e-18, niter=2000, interval=10)
+    result_BH = basinhopping(eigenval_single_k, kprime_guess, T=1e-18, stepsize=1e-18, niter=10000, interval=10)
     print()
-    print("x basinhopping = ", result_BH.x)
-    print("y basinhopping = ", result_BH.fun)
-    print(result_BH)
+    print(result_BH.message)
+    print("x basinhopping = ", np.array(result_BH.x) / (hbar*c),"cm^-1")
+    print("y basinhopping = ", -result_BH.fun/hbar/1e10,"1e10 s^-1")
+    #print(result_BH)
 
     kprime_guess = result_BH.x
     #result_CG = minimize(eigenval_single_k, kprime_guess, method = 'trust-constr', tol=1e-30, options={"xtol":1e-50})
     result_CG = minimize(eigenval_single_k, kprime_guess, method = 'CG', tol=1e-25)
     print()
-    print("x opt = ", result_CG.x)
-    print("y opt = ", result_CG.fun)
-    print(result_CG)
+    print(result_CG.message)
+    print("x opt = ", np.array(result_CG.x) / (hbar*c),"cm^-1")
+    print("y opt = ", -result_CG.fun/hbar/1e10,"1e10 s^-1")
+    #print(result_CG)
 
 #def f(x):
 #    return ((x[1])**2 + x[0]**2) * 1e-17
