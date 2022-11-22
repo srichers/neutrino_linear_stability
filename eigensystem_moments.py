@@ -237,7 +237,7 @@ def construct_3D_kprime_grid(max_ktarget_multiplier, numb_k, nphi_at_equator):
 # do the real work for a single k #
 #=================================#
 # k:dimensionless output:dimensionless
-def eigenvalues_single_k(kprime):
+def eigenvalues_single_k(kprime, verbose=False):
     # complete the stability matrix
     C = np.frombuffer(C_RA).reshape((2,3,3))
     S_nok = np.frombuffer(S_nok_RA).reshape((8,8))
@@ -246,6 +246,12 @@ def eigenvalues_single_k(kprime):
     S[4  , 5:8] -= kprime
     S[1:4, 0  ] -= np.tensordot(kprime, C[0], axes=1)
     S[5:8, 4  ] -= np.tensordot(kprime, C[1], axes=1)
+
+    if(verbose):
+        print("C=")
+        print(C)
+        print("S=")
+        print(S)
 
     # find the eigenvalues
     return np.linalg.eigvals(S)
@@ -287,7 +293,7 @@ def compute_max_eigenvalue(ne, N, F, flavor_trace_chi, flavor_trace_fhat, max_kt
     assert(max_ktarget_multiplier > 0)
     
     # set up the shared data
-    construct_S_nok(N, F, flavor_trace_chi, flavor_trace_fhat)
+    construct_S_nok(N, F, flavor_trace_chi, flavor_trace_fhat, verbose=False)
     
     # function that optimizer will use
     def max_eigenval_single_k(kprime):
@@ -295,44 +301,51 @@ def compute_max_eigenvalue(ne, N, F, flavor_trace_chi, flavor_trace_fhat, max_kt
         result = -np.max(np.imag(evals))
         return result
 
-    def resolve_iters(method, max_eigenval_single_k, bounds):
-        iters = 1
-        error = 1e99
-        result = method(max_eigenval_single_k, bounds, iters=iters)
-        while(error > 1e-3):
-            iters += 1
-            result_new = method(max_eigenval_single_k, bounds, iters=iters)
-            error = np.abs(result_new.fun-result.fun) / (np.abs(result_new.fun)+np.abs(result.fun))
-            result = result_new
-            print("iters =",iters, "error =",error)
-        return result_new
-        
-    # find k that maximizes eigenvalues. All dimensionless
-    kprime_bound = 1 #max_ktarget_multiplier
-    count = 0
-    record_fun = 0
-    while True:
+    def resolve_iters(method, max_eigenval_single_k, kprime_bound):
         kprime_bounds = (-kprime_bound, kprime_bound)
         bounds = (kprime_bounds, kprime_bounds, kprime_bounds)
-        result_new = resolve_iters(method, max_eigenval_single_k, bounds) #method(max_eigenval_single_k, bounds, iters=2)
-        if(not result_new.success):
-            print(result_new.message)
-            assert(False)
+        iters = 2
+        error = 1e99
+        result = method(max_eigenval_single_k, bounds, iters=iters)
+        while(error > 1e-4):
+            iters += 1
+            result_new = method(max_eigenval_single_k, bounds, iters=iters, sampling_method='sobol', n=32, options={"minimize_every_iter":True}) # sampling_method='sobol', n=64, options={"minimize_every_iter":True}
+            error_fun = np.abs(result_new.fun-result.fun) / (np.abs(result_new.fun)+np.abs(result.fun))
+            error_kmax = np.linalg.norm(result.x-result_new.x) / np.linalg.norm(result.x)
+            error = max(error_fun, error_kmax)
+            #if error==0: error=1
+            result = result_new
+            print("iters =",iters, "error =",error_fun, error_kmax)
+        return result_new
+
+    def resolve_bounds(method, max_eigenval_single_k):
+        kprime_bound = 0.5
+        record_fun = 0
+        while True:
+            kprime_bound *= 2
+            result_new = resolve_iters(method, max_eigenval_single_k, kprime_bound) #method(max_eigenval_single_k, bounds, iters=2)
+            if(not result_new.success):
+                print(result_new.message)
+                assert(False)
         
-        kprime_max = np.array(result_new.x)
-        kp_relative_to_bound = np.linalg.norm(kprime_max)/(kprime_bound*np.sqrt(3))
-        print(count, kprime_bound, "|kprime_max|/bound = ",kp_relative_to_bound, result_new.fun)
-        count += 1
-        kprime_bound *= 2
-        if result_new.fun < record_fun:
-            record_fun = result_new.fun
-            result = copy.deepcopy(result_new)
-        elif kp_relative_to_bound < 0.5:
-            break
-        
-            
+            kprime_max = np.array(result_new.x)
+            kp_relative_to_bound = np.linalg.norm(kprime_max)/(kprime_bound*np.sqrt(3))
+            print(kprime_bound, "|kprime_max|/bound = ",kp_relative_to_bound, result_new.fun)
+            if result_new.fun <= record_fun:
+                record_fun = result_new.fun
+                result = copy.deepcopy(result_new)
+            elif kp_relative_to_bound < 0.5:
+                break
+
+        return result, kprime_bound
+
+    #result, kprime_bound = resolve_bounds(method, max_eigenval_single_k)
+    kprime_bound = 128
+    result = resolve_iters(method, max_eigenval_single_k, kprime_bound)
+    kprime_max = np.array(result.x)
+    
     #assert(kp_relative_to_bound < 1.)
-    eigenvaluesprime = eigenvalues_single_k(kprime_max)
+    eigenvaluesprime = eigenvalues_single_k(kprime_max,verbose=False)
 
     kp = result.x
     ep = eigenvalues_single_k(kp)
@@ -378,14 +391,14 @@ if __name__ == '__main__':
     # initial conditions
     #--------
     # 2 Beam
-    Nee    = 4.89e32
-    Neebar = 4.89e32
-    Nxx    = 0
-    Nxxbar = 0
-    Fee    = np.array([0,0, 1]) * Nee
-    Feebar = np.array([0,0,-1]) * Neebar
-    Fxx    = np.array([0,0, 0])
-    Fxxbar = np.array([0,0, 0])
+    #Nee    = 4.89e32
+    #Neebar = 4.89e32
+    #Nxx    = 0
+    #Nxxbar = 0
+    #Fee    = np.array([0,0, 1]) * Nee
+    #Feebar = np.array([0,0,-1]) * Neebar
+    #Fxx    = np.array([0,0, 0])
+    #Fxxbar = np.array([0,0, 0])
     
     # Fiducial
     #Nee    = 4.89e32
@@ -438,14 +451,14 @@ if __name__ == '__main__':
     #Fxxbar = Fxx
 
     # NSM3
-    #Nee    =  2.8800567085107055e+33
-    #Neebar =  3.742165367460379e+33
-    #Nxx    =  1.9326488735792792e+33/4.*0
-    #Nxxbar = Nxx
-    #Fee    = np.array([ 0.00044576, -0.0032902 ,  0.00438115]) * Nee
-    #Feebar = np.array([ 0.00034307, -0.00253221, -0.13056626]) * Neebar
-    #Fxx    = np.array([-0.00082875, -0.00513641, -0.1291853 ]) * Nxx
-    #Fxxbar = Fxx
+    Nee    =  2.8800567085107055e+33
+    Neebar =  3.742165367460379e+33
+    Nxx    =  1.9326488735792792e+33/4.*0
+    Nxxbar = Nxx
+    Fee    = np.array([ 0.00044576, -0.0032902 ,  0.00438115]) * Nee
+    Feebar = np.array([ 0.00034307, -0.00253221, -0.13056626]) * Neebar
+    Fxx    = np.array([-0.00082875, -0.00513641, -0.1291853 ]) * Nxx
+    Fxxbar = Fxx
 
     #==========================#
     # Construct N and F arrays #
