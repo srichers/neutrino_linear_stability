@@ -304,17 +304,17 @@ def compute_max_eigenvalue(ne, N, F, flavor_trace_chi, flavor_trace_fhat, max_kt
     def resolve_iters(method, max_eigenval_single_k, kprime_bound):
         kprime_bounds = (-kprime_bound, kprime_bound)
         bounds = (kprime_bounds, kprime_bounds, kprime_bounds)
-        iters = 2
+        iters = 1
         error = 1e99
         result = method(max_eigenval_single_k, bounds, iters=iters)
-        while(error > 1e-4):
+        while(error > 1e-3):
             iters += 1
-            result_new = method(max_eigenval_single_k, bounds, iters=iters, sampling_method='sobol', n=32, options={"minimize_every_iter":True}) # sampling_method='sobol', n=64, options={"minimize_every_iter":True}
-            error_fun = np.abs(result_new.fun-result.fun) / (np.abs(result_new.fun)+np.abs(result.fun))
-            error_kmax = np.linalg.norm(result.x-result_new.x) / np.linalg.norm(result.x)
-            error = max(error_fun, error_kmax)
+            result_new = method(max_eigenval_single_k, bounds, iters=iters)#, sampling_method='sobol', n=64)#, options={"minimize_every_iter":True}) # 
+            error_fun = np.abs(result_new.fun-result.fun)# / (np.abs(result_new.fun)+np.abs(result.fun))
+            error_kmax = np.linalg.norm(result.x-result_new.x)# / (np.linalg.norm(result.x)+np.linalg.norm(result_new.x))
+            error = error_fun #max(error_fun, error_kmax)
             #if error==0: error=1
-            result = result_new
+            result = copy.deepcopy(result_new)
             print("iters =",iters, "error =",error_fun, error_kmax)
         return result_new
 
@@ -340,7 +340,7 @@ def compute_max_eigenvalue(ne, N, F, flavor_trace_chi, flavor_trace_fhat, max_kt
         return result, kprime_bound
 
     #result, kprime_bound = resolve_bounds(method, max_eigenval_single_k)
-    kprime_bound = 128
+    kprime_bound = 1024
     result = resolve_iters(method, max_eigenval_single_k, kprime_bound)
     kprime_max = np.array(result.x)
     
@@ -350,12 +350,13 @@ def compute_max_eigenvalue(ne, N, F, flavor_trace_chi, flavor_trace_fhat, max_kt
     kp = result.x
     ep = eigenvalues_single_k(kp)
     k,e = restore_units(ne, N, F, kp, ep)
-    print("testing solution: ", k/(hbar*c), np.max(np.imag(e)))
+    print("testing solution: ", k/(hbar*c), np.max(np.imag(e)), "N=",np.sum(N)*GF/(hbar*c),"cm^-1","=",np.sum(N)*GF,"erg")
 
     # restore units
     kmax, eigenvalues = restore_units(ne, N, F, np.array([kprime_max]), np.array([eigenvaluesprime]))
+    print("kp=",kp)
 
-    return kmax, eigenvalues, kprime_bound
+    return kp, ep, kmax, eigenvalues, kprime_bound
 
 def print_info(k_grid, eigenvalues):
     k_mag_max = np.max(np.sqrt(np.sum(k_grid**2,axis=1)))
@@ -381,7 +382,7 @@ def print_info(k_grid, eigenvalues):
     
     print("|k_max| = ", "{:e}".format(np.linalg.norm(k_max)/(hbar*c)),"cm^-1")
     print("lambda =", "{:e}".format((2.*np.pi*hbar*c)/np.linalg.norm(k_max)),"cm")
-    print("max_growthrate =","{:e}".format(np.max(I)),"erg")
+    print("max_growthrate =","{:e}".format(np.max(I)/hbar),"s^-1")
     #print()
 
     
@@ -421,14 +422,14 @@ if __name__ == '__main__':
     #Fxxbar = np.array([0, 0   , 0   ])
     
     # TwoThirds
-    #Nee    = 4.89e32
-    #Neebar = 4.89e32 * 2./3.
-    #Nxx    = 0
-    #Nxxbar = 0
-    #Fee    = np.array([0,0,  0   ]) * Nee
-    #Feebar = np.array([0,0, -1/3.]) * Neebar
-    #Fxx    = np.array([0,0,  0   ])
-    #Fxxbar = np.array([0,0,  0   ])
+    Nee    = 4.89e32
+    Neebar = 4.89e32 * 2./3.
+    Nxx    = 0
+    Nxxbar = 0
+    Fee    = np.array([0,0,  0   ]) * Nee
+    Feebar = np.array([0,0, -1./3]) * Neebar
+    Fxx    = np.array([0,0,  0   ])
+    Fxxbar = np.array([0,0,  0   ])
     
     # NSM1
     #Nee    = 1.421954234999705e+33
@@ -451,24 +452,24 @@ if __name__ == '__main__':
     #Fxxbar = Fxx
 
     # NSM3
-    Nee    =  2.8800567085107055e+33
-    Neebar =  3.742165367460379e+33
-    Nxx    =  1.9326488735792792e+33/4.*0
-    Nxxbar = Nxx
-    Fee    = np.array([ 0.00044576, -0.0032902 ,  0.00438115]) * Nee
-    Feebar = np.array([ 0.00034307, -0.00253221, -0.13056626]) * Neebar
-    Fxx    = np.array([-0.00082875, -0.00513641, -0.1291853 ]) * Nxx
-    Fxxbar = Fxx
+    #Nee    =  2.8800567085107055e+33
+    #Neebar =  3.742165367460379e+33
+    #Nxx    =  1.9326488735792792e+33/4.
+    #Nxxbar = Nxx
+    #Fee    = np.array([ 0.00044576, -0.0032902 ,  0.00438115]) * Nee
+    #Feebar = np.array([ 0.00034307, -0.00253221, -0.13056626]) * Neebar
+    #Fxx    = np.array([-0.00082875, -0.00513641, -0.1291853 ]) * Nxx
+    #Fxxbar = Fxx
 
     #==========================#
     # Construct N and F arrays #
     #==========================#
     flavor_trace_chi = True  # in calculation of P. Always true in Cij
     flavor_trace_fhat = True # in calculation of P. Always true in Cij
-    max_ktarget_multiplier = 1
+    max_ktarget_multiplier = 10
     rho = 0 # g/ccm
     Ye = 0.5
-    nthreads = 16
+    nthreads = 24
     method = scipy.optimize.shgo
     
     ne = rho*Ye/Mp
@@ -480,20 +481,21 @@ if __name__ == '__main__':
 
     # global optimizer
     print()
-    kmax_opt, eigenvalues_opt, max_ktarget_multiplier = compute_max_eigenvalue(ne, N, F, True, True, max_ktarget_multiplier, method=method)
+    kprime, eigenvaluesprime, kmax_opt, eigenvalues_opt, max_ktarget_multiplier = compute_max_eigenvalue(ne, N, F, True, True, max_ktarget_multiplier, method=method)
+    print_info(kmax_opt, eigenvalues_opt)
+    kmag = np.linalg.norm(kmax_opt)
+
+    print()
+    kprime, eigenvaluesprime, kmax_opt, eigenvalues_opt, max_ktarget_multiplier = compute_max_eigenvalue(ne, N, F, True, False, max_ktarget_multiplier, method=method)
     print_info(kmax_opt, eigenvalues_opt)
 
-    #print()
-    #kmax_opt, eigenvalues_opt = compute_max_eigenvalue(ne, N, F, True, False, max_ktarget_multiplier, method=method)
-    #print_info(kmax_opt, eigenvalues_opt)
+    print()
+    kprime, eigenvaluesprime, kmax_opt, eigenvalues_opt, max_ktarget_multiplier = compute_max_eigenvalue(ne, N, F, False, True, max_ktarget_multiplier, method=method)
+    print_info(kmax_opt, eigenvalues_opt)
 
-    #print()
-    #kmax_opt, eigenvalues_opt = compute_max_eigenvalue(ne, N, F, False, True, max_ktarget_multiplier, method=method)
-    #print_info(kmax_opt, eigenvalues_opt)
-
-    #print()
-    #kmax_opt, eigenvalues_opt = compute_max_eigenvalue(ne, N, F, False, False, max_ktarget_multiplier, method=method)
-    #print_info(kmax_opt, eigenvalues_opt)
+    print()
+    kprime, eigenvaluesprime, kmax_opt, eigenvalues_opt, max_ktarget_multiplier = compute_max_eigenvalue(ne, N, F, False, False, max_ktarget_multiplier, method=method)
+    print_info(kmax_opt, eigenvalues_opt)
 
     #===================#
     # compute full grid #
@@ -501,37 +503,43 @@ if __name__ == '__main__':
     print()
     print("### GRID SEARCH ###")
     numb_k = 500
+    max_ktarget_multiplier = 10
 
-    max_ktarget_multiplier *= np.sqrt(3)
-    kprime_grid_x = construct_1D_kprime_grid(max_ktarget_multiplier, numb_k, [1,0,0])
-    k_grid_x, eigenvalues_x = compute_all_eigenvalues(ne, N, F, flavor_trace_chi, flavor_trace_fhat, kprime_grid_x, nthreads)
-    maxevals_x = np.max(np.imag(eigenvalues_x), axis=1)
-    
-    kprime_grid_y = construct_1D_kprime_grid(max_ktarget_multiplier, numb_k, [0,1,0])
-    k_grid_y, eigenvalues_y = compute_all_eigenvalues(ne, N, F, flavor_trace_chi, flavor_trace_fhat, kprime_grid_y, nthreads)
-    maxevals_y = np.max(np.imag(eigenvalues_y), axis=1)
+    def plot_line(direction,label, linestyle):
+        direction = direction / np.linalg.norm(direction)
+        kprime_grid = construct_1D_kprime_grid(max_ktarget_multiplier, numb_k, direction)
+        k_grid, eigenvalues = compute_all_eigenvalues(ne, N, F, flavor_trace_chi, flavor_trace_fhat, kprime_grid, nthreads)
+        k_grid = np.sum(k_grid[:,:] * direction[np.newaxis,:],axis=1)
+        maxevals = np.max(np.imag(eigenvalues), axis=1)
+        plt.plot(k_grid/(hbar*c), maxevals/(hbar), label=label,alpha=1,linestyle=linestyle)
+        imax = np.argmax(maxevals)
+        print("kmax=",k_grid[imax]/(hbar*c),"cm^-1")
+        print("maxeval=",maxevals[imax]/hbar,"s^-1")
 
-    kprime_grid_z = construct_1D_kprime_grid(max_ktarget_multiplier, numb_k, [0,0,1])
-    k_grid_z, eigenvalues_z = compute_all_eigenvalues(ne, N, F, flavor_trace_chi, flavor_trace_fhat, kprime_grid_z, nthreads)
-    maxevals_z = np.max(np.imag(eigenvalues_z), axis=1)
-
-    direction =  kmax_opt.flatten()#np.array([ 1.623832e+05 , -2.320192e+04 , -1.165989e+05 ])
-    direction = direction / np.linalg.norm(direction)
-    kprime_grid_problem = construct_1D_kprime_grid(max_ktarget_multiplier, numb_k, direction)
-    k_grid_problem, eigenvalues_problem = compute_all_eigenvalues(ne, N, F, flavor_trace_chi, flavor_trace_fhat, kprime_grid_problem, nthreads)
-    k_grid_problem = np.sum(k_grid_problem[:,:] * direction[np.newaxis,:],axis=1)
-    maxevals_problem = np.max(np.imag(eigenvalues_problem), axis=1)
+    plot_line(kprime.flatten(),"kmax","-")
+    plot_line([1,0,0],"kx","-")
+    plot_line([0,1,0],"ky","--")
+    plot_line([0,2,1],"kyyz","-")
+    plot_line([0,1,1],"kyz","-")
+    plot_line([0,1,2],"kyzz","-")
+    plot_line([0,0,1],"kz",":")
     
-    plt.plot(k_grid_x[:,0], maxevals_x, label="kx",alpha=0.5)
-    plt.plot(k_grid_y[:,1], maxevals_y, label="ky",alpha=0.5)
-    plt.plot(k_grid_z[:,2], maxevals_z, label="kz",alpha=0.5)
-    plt.plot(k_grid_problem.flatten(), maxevals_problem, label="kproblem")
     
-    plt.axhline(np.max(np.imag(eigenvalues_opt)),color='gray')
-    kmag = np.linalg.norm(kmax_opt)
-    plt.axvline(kmag,color="gray")
-    plt.xlabel(r"$k$ (erg)")
-    plt.ylabel(r"max Im$(\Omega)$ (erg)")
+    #direction =  kprime.flatten()#np.array([ 1.623832e+05 , -2.320192e+04 , -1.165989e+05 ])
+    #if(np.linalg.norm(direction)==0): direction=np.array([0,0,1])
+    #direction = direction / np.linalg.norm(direction)
+    #kprime_grid_problem = construct_1D_kprime_grid(max_ktarget_multiplier, numb_k, direction)
+    #k_grid_problem, eigenvalues_problem = compute_all_eigenvalues(ne, N, F, flavor_trace_chi, flavor_trace_fhat, kprime_grid_problem, nthreads)
+    #k_grid_problem = np.sum(k_grid_problem[:,:] * direction[np.newaxis,:],axis=1)
+    #maxevals_problem = np.max(np.imag(eigenvalues_problem), axis=1)
+    
+    #plt.plot(k_grid_problem.flatten()/(hbar*c), maxevals_problem/(hbar), label="kmax")
+    
+    plt.axhline(np.max(np.imag(eigenvalues_opt))/hbar,color='gray')
+    plt.axvline(kmag/(hbar*c),color="gray")
+    plt.axvline(-kmag/(hbar*c),color="gray")
+    plt.xlabel(r"$k$ (cm$^{-1}$)")
+    plt.ylabel(r"max Im$(\Omega)$ (s$^{-1}$)")
     plt.legend()
     plt.savefig("1D_eigenvalues.pdf")
     
